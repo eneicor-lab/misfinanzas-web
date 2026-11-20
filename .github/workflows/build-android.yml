@@ -1,0 +1,88 @@
+name: Build MisFinanzas BETA17 Android (debug)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Build debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout BETA17 web source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: |
+            platforms;android-35
+            build-tools;35.0.0
+
+      - name: Create a temporary Capacitor Android wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s index.html
+          test -s app.js
+          mkdir -p www
+          cp index.html app.js www/
+
+          cat > package.json <<'JSON'
+          {
+            "name": "misfinanzas-beta17-android-build",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "7.6.9",
+              "@capacitor/android": "7.6.9"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "7.6.9"
+            }
+          }
+          JSON
+
+          cat > capacitor.config.json <<'JSON'
+          {
+            "appId": "com.misfinanzas.personal",
+            "appName": "MisFinanzas",
+            "webDir": "www",
+            "server": {
+              "androidScheme": "https"
+            }
+          }
+          JSON
+
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Publish APK artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: MisFinanzas-BETA17-Android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
