@@ -1,0 +1,29 @@
+name: Verificar Supabase
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Instalar cliente PostgreSQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Verificar conexion
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+          PGCONNECT_TIMEOUT: 15
+        run: |
+          psql "$SUPABASE_DB_URL" \
+            -X -v ON_ERROR_STOP=1 \
+            -c "BEGIN READ ONLY; SELECT 1 AS conexion_ok; ROLLBACK;"
+          echo "EXITO: Conexion con Supabase verificada."
