@@ -1,0 +1,50 @@
+name: Verificar Google Drive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verificar conexion
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import json
+          import urllib.request
+          import urllib.parse
+
+          data = urllib.parse.urlencode({
+              "client_id": os.environ["GOOGLE_CLIENT_ID"],
+              "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
+              "refresh_token": os.environ["GOOGLE_REFRESH_TOKEN"],
+              "grant_type": "refresh_token"
+          }).encode()
+
+          with urllib.request.urlopen(
+              "https://oauth2.googleapis.com/token",
+              data=data, timeout=30
+          ) as response:
+              token = json.load(response)["access_token"]
+
+          request = urllib.request.Request(
+              "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id)",
+              headers={"Authorization": "Bearer " + token}
+          )
+
+          with urllib.request.urlopen(request, timeout=30) as response:
+              if response.status != 200:
+                  raise RuntimeError("Error de conexion")
+
+          print("EXITO: Conexion con Google Drive verificada.")
+          PY
