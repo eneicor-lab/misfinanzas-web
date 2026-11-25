@@ -3,7 +3,7 @@
   "version": "2.7.0-rc2",
   "private": true,
   "scripts": {
-    "test": "node tests/run-integral.cjs && node tests/schedule-engine.test.cjs && node tests/http-smoke.cjs && node tests/planning.test.cjs && node tests/module-sync.test.cjs && node tests/auth-policy.test.cjs",
+    "test": "node tests/run-integral.cjs && node tests/schedule-engine.test.cjs && node tests/http-smoke.cjs && node tests/planning.test.cjs && node tests/module-sync.test.cjs && node tests/auth-policy.test.cjs && node tests/auth-recovery.test.cjs",
     "test:browser": "playwright test"
   },
   "devDependencies": {
