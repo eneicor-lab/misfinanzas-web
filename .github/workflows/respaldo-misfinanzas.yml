@@ -16,97 +16,92 @@ concurrency:
 jobs:
   respaldo:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
 
-    env:
-      PGHOST: aws-0-sa-east-1.pooler.supabase.com
-      PGPORT: "5432"
-      PGUSER: mf_backup.yjzgpspxvmimduuemxms
-      PGDATABASE: postgres
-      PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      PGSSLMODE: require
-      PGCONNECT_TIMEOUT: "15"
-      BACKUP_KEY: ${{ secrets.MF_BACKUP_ENCRYPTION_KEY }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: temporal_qa
+          POSTGRES_DB: mf_recovery
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-      - name: Preparar herramientas
+
+      - name: Preparar entorno
         run: |
           set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/mf_backup"
+          echo "OK: Entorno temporal preparado."
 
-          sudo install -d /usr/share/postgresql-common/pgdg
-
-          sudo curl --fail --silent --show-error \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-            https://www.postgresql.org/media/keys/ACCC4CF8.asc
-
-          . /etc/os-release
-
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-
-          sudo apt-get update -qq
-
-          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y postgresql-client-17
-
-          export PATH="/usr/lib/postgresql/17/bin:$PATH"
-          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
-
-          pg_dump --version
-          pg_restore --version
-          gpg --version
-
-          pg_dump --version | grep -E 'PostgreSQL\) 17\.'
-
-          echo "OK: PostgreSQL 17 disponible."
-
-      - name: Validar configuracion
-        run: |
-          set -euo pipefail
-
-          test -n "$PGPASSWORD"
-          test "${#BACKUP_KEY}" -ge 48
-          test -n "$GOOGLE_CLIENT_ID"
-          test -n "$GOOGLE_CLIENT_SECRET"
-          test -n "$GOOGLE_REFRESH_TOKEN"
-
-          psql -X -w -v ON_ERROR_STOP=1 \
-            -c "BEGIN READ ONLY; SELECT current_user, current_setting('server_version'); ROLLBACK;"
-
-          echo "OK: Configuracion validada."
-
-      - name: Generar y cifrar respaldo
+      - name: Generar respaldo estructural
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+          PGHOST: aws-0-sa-east-1.pooler.supabase.com
+          PGPORT: "5432"
+          PGUSER: mf_backup.yjzgpspxvmimduuemxms
+          PGDATABASE: postgres
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PGSSLMODE: require
+          PGCONNECT_TIMEOUT: "15"
         run: |
           set -euo pipefail
           umask 077
 
           DIR="$RUNNER_TEMP/mf_backup"
-          mkdir -p "$DIR"
-
           FILE="$DIR/MisFinanzas_$(date -u +%Y%m%dT%H%M%SZ).dump"
 
-          pg_dump \
-            --format=custom \
-            --enable-row-security \
-            --no-owner \
-            --no-privileges \
-            --no-password \
-            --table=public.mf_accounts \
-            --table=public.mf_allocations \
-            --table=public.mf_audit \
-            --table=public.mf_beneficiaries \
-            --table=public.mf_categories \
-            --table=public.mf_due \
-            --table=public.mf_events \
-            --table=public.mf_notifications \
-            --table=public.mf_obligations \
-            --table=public.mf_tariffs \
-            --file="$FILE"
+          docker exec "$CONTAINER_ID" pg_dump --version
+
+          docker exec \
+            -e PGHOST \
+            -e PGPORT \
+            -e PGUSER \
+            -e PGDATABASE \
+            -e PGPASSWORD \
+            -e PGSSLMODE \
+            -e PGCONNECT_TIMEOUT \
+            "$CONTAINER_ID" \
+            pg_dump \
+              --format=custom \
+              --schema=public \
+              --enable-row-security \
+              --no-password \
+            > "$FILE"
 
           test -s "$FILE"
 
-          pg_restore --list "$FILE" > /dev/null
+          docker cp "$FILE" \
+            "$CONTAINER_ID:/tmp/source.dump"
+
+          docker exec "$CONTAINER_ID" \
+            pg_restore --list /tmp/source.dump \
+            > "$DIR/inventario.txt"
+
+          grep -q 'FUNCTION public mf_post_basic' \
+            "$DIR/inventario.txt"
+
+          grep -q 'FUNCTION public mf_reject_owner_change' \
+            "$DIR/inventario.txt"
+
+          echo "BACKUP_FILE=$FILE" >> "$GITHUB_ENV"
+
+          echo "OK: Esquema public respaldado."
+          echo "OK: Funciones financieras incluidas."
+
+      - name: Cifrar respaldo
+        env:
+          BACKUP_KEY: ${{ secrets.MF_BACKUP_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          test "${#BACKUP_KEY}" -ge 48
 
           printf '%s\n' "$BACKUP_KEY" | gpg \
             --batch --yes \
@@ -114,32 +109,21 @@ jobs:
             --passphrase-fd 0 \
             --symmetric \
             --cipher-algo AES256 \
-            --output "$FILE.gpg" \
-            "$FILE"
+            --output "$BACKUP_FILE.gpg" \
+            "$BACKUP_FILE"
 
-          test -s "$FILE.gpg"
+          test -s "$BACKUP_FILE.gpg"
 
-          printf '%s\n' "$BACKUP_KEY" | gpg \
-            --batch --yes \
-            --pinentry-mode loopback \
-            --passphrase-fd 0 \
-            --decrypt \
-            --output "$DIR/verificacion.dump" \
-            "$FILE.gpg"
-
-          cmp "$FILE" "$DIR/verificacion.dump"
-
-          rm -f "$FILE" "$DIR/verificacion.dump"
-
-          echo "BACKUP_FILE=$FILE.gpg" >> "$GITHUB_ENV"
-
-          echo "OK: Respaldo generado."
           echo "OK: Cifrado AES-256 completado."
-          echo "OK: Descifrado e integridad local verificados."
 
-      - name: Transferir y verificar Google Drive
+      - name: Almacenar y recuperar desde Google Drive
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
         run: |
           set -euo pipefail
+          umask 077
 
           python3 <<'PY'
           import os
@@ -177,17 +161,62 @@ jobs:
               "Authorization": "Bearer " + token
           }
 
-          file = Path(os.environ["BACKUP_FILE"])
-          content = file.read_bytes()
+          api = "https://www.googleapis.com/drive/v3/files"
 
+          folder_query = urllib.parse.urlencode({
+              "q": (
+                  "trashed = false and "
+                  "mimeType = 'application/vnd.google-apps.folder' "
+                  "and name = 'MisFinanzas - Respaldos' "
+                  "and appProperties has "
+                  "{ key='application' and value='MisFinanzas' }"
+              ),
+              "fields": "files(id,name)",
+              "pageSize": 100
+          })
+
+          folders = json.loads(request(
+              api + "?" + folder_query,
+              headers=auth
+          )).get("files", [])
+
+          if len(folders) > 1:
+              raise RuntimeError(
+                  "Existen carpetas de respaldo duplicadas."
+              )
+
+          if folders:
+              folder_id = folders[0]["id"]
+          else:
+              folder = json.loads(request(
+                  api + "?fields=id",
+                  json.dumps({
+                      "name": "MisFinanzas - Respaldos",
+                      "mimeType":
+                          "application/vnd.google-apps.folder",
+                      "appProperties": {
+                          "application": "MisFinanzas"
+                      }
+                  }).encode(),
+                  {
+                      **auth,
+                      "Content-Type": "application/json"
+                  }
+              ))
+              folder_id = folder["id"]
+
+          file = Path(os.environ["BACKUP_FILE"] + ".gpg")
+          content = file.read_bytes()
           boundary = uuid.uuid4().hex
 
           metadata = json.dumps({
               "name": file.name,
               "mimeType": "application/octet-stream",
+              "parents": [folder_id],
               "appProperties": {
                   "application": "MisFinanzas",
-                  "type": "encrypted-backup"
+                  "type": "encrypted-backup",
+                  "format": "schema-public-v2"
               }
           }).encode()
 
@@ -213,8 +242,7 @@ jobs:
           ))
 
           remote = request(
-              "https://www.googleapis.com/drive/v3/files/"
-              + result["id"] + "?alt=media",
+              api + "/" + result["id"] + "?alt=media",
               headers=auth
           )
 
@@ -223,17 +251,366 @@ jobs:
 
           if local_hash != remote_hash:
               raise RuntimeError(
-                  "ERROR: El archivo remoto no coincide."
+                  "El archivo remoto no coincide."
               )
 
-          print("OK: Archivo almacenado en Google Drive.")
-          print("OK: Integridad remota SHA-256 verificada.")
+          target = file.parent / "recuperado.gpg"
+          target.write_bytes(remote)
+
+          print("OK: Respaldo almacenado en Google Drive.")
+          print("OK: Archivo remoto recuperado.")
+          print("OK: Integridad SHA-256 verificada.")
           print("Archivo:", file.name)
           print("Bytes:", len(content))
           print("SHA-256:", local_hash)
           PY
 
+      - name: Descifrar archivo recuperado
+        env:
+          BACKUP_KEY: ${{ secrets.MF_BACKUP_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          DIR="$RUNNER_TEMP/mf_backup"
+
+          printf '%s\n' "$BACKUP_KEY" | gpg \
+            --batch --yes \
+            --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --decrypt \
+            --output "$DIR/recuperado.dump" \
+            "$DIR/recuperado.gpg"
+
+          cmp "$BACKUP_FILE" "$DIR/recuperado.dump"
+
+          echo "OK: Descifrado e integridad verificados."
+
+      - name: Preparar PostgreSQL aislado
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          docker cp \
+            "$RUNNER_TEMP/mf_backup/recuperado.dump" \
+            "$CONTAINER_ID:/tmp/recovery.dump"
+
+          docker exec -i "$CONTAINER_ID" \
+            psql -X -U postgres -d mf_recovery \
+            -v ON_ERROR_STOP=1 <<'SQL'
+
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE service_role NOLOGIN;
+          CREATE ROLE mf_backup NOLOGIN;
+
+          CREATE SCHEMA auth;
+          CREATE SCHEMA extensions;
+
+          CREATE EXTENSION IF NOT EXISTS pgcrypto
+          WITH SCHEMA extensions;
+
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+          WITH SCHEMA extensions;
+
+          CREATE TABLE auth.users (
+              id uuid PRIMARY KEY
+          );
+
+          CREATE FUNCTION auth.uid()
+          RETURNS uuid
+          LANGUAGE sql STABLE
+          AS $$
+              SELECT NULLIF(
+                  current_setting(
+                      'request.jwt.claim.sub', true
+                  ), ''
+              )::uuid
+          $$;
+
+          GRANT USAGE ON SCHEMA auth TO authenticated;
+          GRANT EXECUTE ON FUNCTION auth.uid()
+          TO authenticated;
+
+          DROP SCHEMA public;
+
+          SQL
+
+          echo "OK: Base aislada preparada."
+
+      - name: Restaurar estructura inicial
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          docker exec "$CONTAINER_ID" \
+            pg_restore \
+              -U postgres \
+              -d mf_recovery \
+              --section=pre-data \
+              --no-owner \
+              --no-privileges \
+              --exit-on-error \
+              --single-transaction \
+              /tmp/recovery.dump
+
+          echo "OK: Estructura inicial restaurada."
+
+      - name: Restaurar registros
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          if ! docker exec "$CONTAINER_ID" \
+            pg_restore \
+              -U postgres \
+              -d mf_recovery \
+              --section=data \
+              --no-owner \
+              --no-privileges \
+              --exit-on-error \
+              --single-transaction \
+              /tmp/recovery.dump \
+              > "$RUNNER_TEMP/mf_backup/data.log" 2>&1
+          then
+            echo "::error::Fallo al restaurar registros."
+            exit 1
+          fi
+
+          echo "OK: Registros restaurados."
+
+      - name: Reconstruir referencias de propietarios
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          docker exec -i "$CONTAINER_ID" \
+            psql -X -U postgres -d mf_recovery \
+            -v ON_ERROR_STOP=1 <<'SQL'
+
+          DO $$
+          DECLARE
+              t record;
+          BEGIN
+              FOR t IN
+                  SELECT table_name
+                  FROM information_schema.columns
+                  WHERE table_schema = 'public'
+                    AND column_name = 'owner_id'
+                    AND left(table_name, 3) = 'mf_'
+              LOOP
+                  EXECUTE format(
+                      'INSERT INTO auth.users(id)
+                       SELECT DISTINCT owner_id
+                       FROM public.%I
+                       WHERE owner_id IS NOT NULL
+                       ON CONFLICT DO NOTHING',
+                      t.table_name
+                  );
+              END LOOP;
+          END $$;
+
+          SQL
+
+          echo "OK: Referencias reconstruidas."
+          echo "No se copiaron credenciales de autenticacion."
+
+      - name: Restaurar restricciones y seguridad
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          if ! docker exec "$CONTAINER_ID" \
+            pg_restore \
+              -U postgres \
+              -d mf_recovery \
+              --section=post-data \
+              --no-owner \
+              --no-privileges \
+              --exit-on-error \
+              --single-transaction \
+              /tmp/recovery.dump \
+              > "$RUNNER_TEMP/mf_backup/post.log" 2>&1
+          then
+            echo "::error::Fallo en restricciones o dependencias."
+            exit 1
+          fi
+
+          echo "OK: Triggers, indices y restricciones restaurados."
+
+      - name: Validar integridad estructural
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          docker exec -i "$CONTAINER_ID" \
+            psql -X -U postgres -d mf_recovery \
+            -v ON_ERROR_STOP=1 <<'SQL'
+
+          DO $$
+          DECLARE
+              t text;
+              n bigint;
+          BEGIN
+              FOREACH t IN ARRAY ARRAY[
+                  'mf_accounts',
+                  'mf_allocations',
+                  'mf_audit',
+                  'mf_beneficiaries',
+                  'mf_categories',
+                  'mf_due',
+                  'mf_events',
+                  'mf_notifications',
+                  'mf_obligations',
+                  'mf_tariffs'
+              ]
+              LOOP
+                  IF to_regclass('public.' || t) IS NULL THEN
+                      RAISE EXCEPTION 'Tabla faltante: %', t;
+                  END IF;
+
+                  EXECUTE format(
+                      'SELECT count(*) FROM public.%I', t
+                  ) INTO n;
+
+                  RAISE NOTICE 'Tabla consultable: %', t;
+              END LOOP;
+
+              IF (
+                  SELECT count(*)
+                  FROM pg_proc p
+                  JOIN pg_namespace s ON s.oid = p.pronamespace
+                  WHERE s.nspname = 'public'
+                    AND p.proname IN (
+                        'mf_post_basic',
+                        'mf_reject_owner_change'
+                    )
+              ) <> 2 THEN
+                  RAISE EXCEPTION 'Funciones incompletas';
+              END IF;
+
+              IF (
+                  SELECT count(*)
+                  FROM pg_trigger t
+                  JOIN pg_class c ON c.oid = t.tgrelid
+                  JOIN pg_namespace s ON s.oid = c.relnamespace
+                  WHERE s.nspname = 'public'
+                    AND NOT t.tgisinternal
+                    AND t.tgname = 'protect_owner'
+                    AND t.tgenabled IN ('O', 'A')
+              ) <> 6 THEN
+                  RAISE EXCEPTION 'Triggers incompletos';
+              END IF;
+
+              IF (
+                  SELECT count(*)
+                  FROM pg_policies
+                  WHERE schemaname = 'public'
+                    AND left(tablename, 3) = 'mf_'
+              ) <> 20 THEN
+                  RAISE EXCEPTION 'Politicas RLS incompletas';
+              END IF;
+
+              IF (
+                  SELECT count(*)
+                  FROM pg_constraint c
+                  JOIN pg_namespace s ON s.oid = c.connamespace
+                  WHERE s.nspname = 'public'
+                    AND c.contype = 'f'
+                    AND c.convalidated
+              ) <> 20 THEN
+                  RAISE EXCEPTION 'Claves foraneas incompletas';
+              END IF;
+
+              IF (
+                  SELECT count(*)
+                  FROM pg_class c
+                  JOIN pg_namespace s ON s.oid = c.relnamespace
+                  WHERE s.nspname = 'public'
+                    AND c.relkind = 'r'
+                    AND left(c.relname, 3) = 'mf_'
+                    AND c.relrowsecurity
+              ) <> 10 THEN
+                  RAISE EXCEPTION 'RLS no esta activo en todas las tablas';
+              END IF;
+
+              IF to_regclass('public.mf_audit_id_seq') IS NULL THEN
+                  RAISE EXCEPTION 'Secuencia faltante';
+              END IF;
+          END $$;
+
+          SQL
+
+          echo "OK: Integridad estructural comprobada."
+
+      - name: Probar triggers recuperados
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          docker exec -i "$CONTAINER_ID" \
+            psql -X -U postgres -d mf_recovery \
+            -v ON_ERROR_STOP=1 <<'SQL'
+
+          BEGIN;
+
+          DO $$
+          DECLARE
+              t text;
+              n bigint;
+          BEGIN
+              FOREACH t IN ARRAY ARRAY[
+                  'mf_accounts',
+                  'mf_beneficiaries',
+                  'mf_categories',
+                  'mf_notifications',
+                  'mf_obligations',
+                  'mf_tariffs'
+              ]
+              LOOP
+                  EXECUTE format(
+                      'UPDATE public.%I SET owner_id = owner_id',
+                      t
+                  );
+
+                  GET DIAGNOSTICS n = ROW_COUNT;
+
+                  IF n = 0 THEN
+                      RAISE NOTICE
+                          'SIN DATOS PARA PRUEBA: %', t;
+                  ELSE
+                      RAISE NOTICE
+                          'ACTUALIZACION VALIDA: %', t;
+                  END IF;
+              END LOOP;
+          END $$;
+
+          ROLLBACK;
+
+          SQL
+
+          echo "OK: Pruebas disponibles de triggers ejecutadas."
+
+      - name: Resultado
+        run: |
+          echo "RESPALDO Y RESTAURACION ESTRUCTURAL EXITOSOS"
+          echo "Supabase Auth no incluido."
+          echo "Permisos efectivos pendientes de prueba."
+          echo "Retencion automatica aun no habilitada."
+
       - name: Limpiar archivos temporales
         if: always()
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
         run: |
+          docker exec "$CONTAINER_ID" \
+            rm -f /tmp/source.dump /tmp/recovery.dump || true
+
           rm -rf "$RUNNER_TEMP/mf_backup"
