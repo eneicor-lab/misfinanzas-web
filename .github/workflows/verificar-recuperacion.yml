@@ -1,0 +1,211 @@
+
+name: Verificar recuperacion MisFinanzas
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recuperacion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: temporal_qa
+          POSTGRES_DB: mf_recovery
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      BACKUP_KEY: ${{ secrets.MF_BACKUP_ENCRYPTION_KEY }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+
+    steps:
+      - name: Descargar respaldo desde Google Drive
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/mf_recovery"
+
+          python3 <<'PY'
+          import os
+          import json
+          import urllib.request
+          import urllib.parse
+          import hashlib
+          from pathlib import Path
+
+          def request(url, data=None, headers=None):
+              req = urllib.request.Request(
+                  url, data=data, headers=headers or {}
+              )
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  return r.read()
+
+          form = urllib.parse.urlencode({
+              "client_id": os.environ["GOOGLE_CLIENT_ID"],
+              "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
+              "refresh_token": os.environ["GOOGLE_REFRESH_TOKEN"],
+              "grant_type": "refresh_token"
+          }).encode()
+
+          token = json.loads(request(
+              "https://oauth2.googleapis.com/token", form
+          ))["access_token"]
+
+          auth = {"Authorization": "Bearer " + token}
+
+          query = urllib.parse.urlencode({
+              "q": "trashed = false and appProperties has { key='application' and value='MisFinanzas' } and appProperties has { key='type' and value='encrypted-backup' }",
+              "orderBy": "createdTime desc",
+              "pageSize": 1,
+              "fields": "files(id,name,size,md5Checksum)"
+          })
+
+          files = json.loads(request(
+              "https://www.googleapis.com/drive/v3/files?" + query,
+              headers=auth
+          )).get("files", [])
+
+          if not files:
+              raise RuntimeError("No se encontro respaldo.")
+
+          f = files[0]
+
+          content = request(
+              "https://www.googleapis.com/drive/v3/files/"
+              + f["id"] + "?alt=media",
+              headers=auth
+          )
+
+          if len(content) != int(f["size"]):
+              raise RuntimeError("Tamano incorrecto.")
+
+          if f.get("md5Checksum"):
+              if hashlib.md5(content).hexdigest() != f["md5Checksum"]:
+                  raise RuntimeError("Integridad incorrecta.")
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "mf_recovery"
+          (path / "backup.gpg").write_bytes(content)
+
+          print("OK: Respaldo recuperado desde Google Drive.")
+          print("Archivo:", f["name"])
+          print("SHA-256:", hashlib.sha256(content).hexdigest())
+          PY
+
+      - name: Descifrar respaldo
+        run: |
+          set -euo pipefail
+          umask 077
+
+          DIR="$RUNNER_TEMP/mf_recovery"
+
+          printf '%s\n' "$BACKUP_KEY" | gpg \
+            --batch --yes \
+            --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --decrypt \
+            --output "$DIR/backup.dump" \
+            "$DIR/backup.gpg"
+
+          test -s "$DIR/backup.dump"
+
+          echo "OK: Descifrado exitoso."
+
+      - name: Restaurar en PostgreSQL temporal
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          docker cp \
+            "$RUNNER_TEMP/mf_recovery/backup.dump" \
+            "$CONTAINER_ID:/tmp/backup.dump"
+
+          docker exec "$CONTAINER_ID" \
+            pg_restore --version
+
+          docker exec "$CONTAINER_ID" \
+            pg_restore --list /tmp/backup.dump \
+            > "$RUNNER_TEMP/mf_recovery/inventario.txt"
+
+          docker exec "$CONTAINER_ID" \
+            psql -U postgres -d mf_recovery \
+            -v ON_ERROR_STOP=1 \
+            -c "CREATE SCHEMA IF NOT EXISTS auth; CREATE ROLE authenticated NOLOGIN; CREATE ROLE anon NOLOGIN; CREATE ROLE service_role NOLOGIN; CREATE ROLE mf_backup NOLOGIN; CREATE TABLE auth.users (id uuid PRIMARY KEY); CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS 'SELECT NULL::uuid';"
+
+          docker exec "$CONTAINER_ID" \
+            pg_restore \
+            --username=postgres \
+            --dbname=mf_recovery \
+            --no-owner \
+            --no-privileges \
+            --exit-on-error \
+            --single-transaction \
+            /tmp/backup.dump
+
+          echo "OK: Restauracion ejecutada."
+
+      - name: Validar tablas recuperadas
+        env:
+          CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+
+          docker exec -i "$CONTAINER_ID" \
+            psql -U postgres -d mf_recovery \
+            -v ON_ERROR_STOP=1 <<'SQL'
+
+          DO $$
+          DECLARE
+              t text;
+              n bigint;
+          BEGIN
+              FOREACH t IN ARRAY ARRAY[
+                  'mf_accounts',
+                  'mf_allocations',
+                  'mf_audit',
+                  'mf_beneficiaries',
+                  'mf_categories',
+                  'mf_due',
+                  'mf_events',
+                  'mf_notifications',
+                  'mf_obligations',
+                  'mf_tariffs'
+              ]
+              LOOP
+                  IF to_regclass('public.' || t) IS NULL THEN
+                      RAISE EXCEPTION 'Tabla faltante: %', t;
+                  END IF;
+
+                  EXECUTE format(
+                      'SELECT count(*) FROM public.%I', t
+                  ) INTO n;
+
+                  RAISE NOTICE 'Tabla recuperada: %', t;
+              END LOOP;
+          END $$;
+
+          SELECT count(*) AS secuencias_recuperadas
+          FROM pg_sequences
+          WHERE schemaname = 'public'
+            AND left(sequencename, 3) = 'mf_';
+
+          SQL
+
+          echo "OK: Diez tablas recuperadas y consultables."
+
+      - name: Limpiar archivos temporales
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/mf_recovery"
