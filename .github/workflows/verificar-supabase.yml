@@ -19,11 +19,18 @@ jobs:
 
       - name: Verificar conexion
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGHOST: aws-0-sa-east-1.pooler.supabase.com
+          PGPORT: "5432"
+          PGUSER: postgres.yjzgpspxvmimduuemxms
+          PGDATABASE: postgres
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           PGSSLMODE: require
-          PGCONNECT_TIMEOUT: 15
+          PGCONNECT_TIMEOUT: "15"
         run: |
-          psql "$SUPABASE_DB_URL" \
-            -X -v ON_ERROR_STOP=1 \
+          if [ -z "$PGPASSWORD" ]; then
+            echo "ERROR: Secreto de contraseña no configurado."
+            exit 1
+          fi
+          psql -X -v ON_ERROR_STOP=1 \
             -c "BEGIN READ ONLY; SELECT 1 AS conexion_ok; ROLLBACK;"
           echo "EXITO: Conexion con Supabase verificada."
