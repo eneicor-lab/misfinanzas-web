@@ -645,7 +645,7 @@ el("mf28Transaction").addEventListener("submit",e=>{
  const type=el("mf28Type").value,from=el("mf28From").value,to=el("mf28To").value,third=el("mf53Third").value.trim(),amountValue=Number(el("mf28Amount").value),date=el("mf28Date").value,concept=el("mf28Concept").value.trim();
  if(!concept||!validDate(date)||!Number.isSafeInteger(amountValue)||amountValue<=0||((type==="income"||type==="expense")&&!third)){el("mf28Status").textContent="Revisa concepto, importe y tercero/pagador";return}
  const id=globalThis.crypto?.randomUUID?.()||String(Date.now())+Math.random();
- const event={id,key:"ui:"+id,type,date,amount:amountValue,concept,...(type==="income"?{to,thirdParty:third}:type==="expense"?{from,thirdParty:third}:{from,to})};
+ const event={id,key:"ui:"+id,type,date,amount:amountValue,concept,category:el("mfPlanCategory")?.value.trim()||"Sin categoría",...(type==="income"?{to,thirdParty:third}:type==="expense"?{from,thirdParty:third}:{from,to})};
  try{const r=post(s,event);if(r.posted){persist(r.state);el("mf28Status").textContent="Movimiento registrado en el motor (solo local)";render()}else el("mf28Status").textContent="Movimiento duplicado"}catch(err){el("mf28Status").textContent="No se registró: "+err.message}
 });
 el("mf28Export").addEventListener("click",()=>{
@@ -757,4 +757,4 @@ $('mf15-file').onchange=async e=>{pending=null;$('mf15-restore').disabled=true;$
 $('mf15-restore').onclick=()=>{if(!pending)return;const replace=$('mf15-replace')?.checked;const target=Object.entries(pending).filter(([k])=>replace||localStorage.getItem(k)===null);if(!target.length){$('mf15-status').textContent='No hay registros nuevos para restaurar.';return}if(!confirm(`Se restaurarán ${target.length} registros locales${replace?' (incluyendo sobrescritura)':''}. Esta acción no modifica Supabase. ¿Continuar?`))return;const previous=new Map(target.map(([k])=>[k,localStorage.getItem(k)]));try{for(const [k,v] of target)localStorage.setItem(k,v);$('mf15-status').textContent=`Restaurados ${target.length} registros. Recarga la aplicación para reflejar los cambios.`;pending=null;$('mf15-restore').disabled=true}catch(err){for(const [k,v] of previous){try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch{}}$('mf15-status').textContent='Error de almacenamiento: se intentó revertir la restauración. Revisa los datos antes de continuar.'}};
 })();
 </script>
-</body></html>
+<script src="planning.js"></script></body></html>

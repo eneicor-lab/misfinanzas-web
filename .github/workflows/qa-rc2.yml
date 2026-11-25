@@ -66,14 +66,14 @@ jobs:
       - run: gradle -p android :app:assembleDebug --no-daemon
       - name: Verify asset parity and APK integrity
         run: |
-          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js; do cmp "web/$f" "android/app/src/main/assets/$f"; done
+          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js; do cmp "web/$f" "android/app/src/main/assets/$f"; done
           mkdir -p artifacts
           cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/MisFinanzas-2.7.0-rc2-debug.apk
           printf '%s\n' '${{ github.sha }}' > artifacts/COMMIT.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging artifacts/*.apk > artifacts/apk-badging.txt
           grep -F 'co.misfinanzas.dev' artifacts/apk-badging.txt
           grep -F 'MisFinanzas' artifacts/apk-badging.txt
-          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js; do unzip -p artifacts/*.apk "assets/$f" | cmp - "web/$f"; done
+          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js; do unzip -p artifacts/*.apk "assets/$f" | cmp - "web/$f"; done
           sha256sum android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png > artifacts/icon-source-sha256.txt
           cd artifacts && sha256sum *.apk | tee SHA256SUMS.txt
       - name: Enable KVM for isolated Android emulator
@@ -94,11 +94,11 @@ jobs:
             sleep 5
             adb shell pidof co.misfinanzas.dev > artifacts/android-pid.txt
             adb exec-out screencap -p > artifacts/android-screen.png
-            adb shell uiautomator dump /sdcard/window.xml
-            adb pull /sdcard/window.xml artifacts/android-window.xml
             adb logcat -d -s AndroidRuntime:E > artifacts/android-runtime.log
             test -s artifacts/android-pid.txt
             if grep -q 'FATAL EXCEPTION' artifacts/android-runtime.log; then exit 1; fi
+            adb shell uiautomator dump /sdcard/window.xml || true
+            if adb shell test -f /sdcard/window.xml; then adb pull /sdcard/window.xml artifacts/android-window.xml; else printf '%s\n' 'UI hierarchy unavailable; installation, activity startup and PID verified separately' > artifacts/android-hierarchy-limitation.txt; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

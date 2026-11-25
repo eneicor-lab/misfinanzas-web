@@ -2,6 +2,11 @@
   "name": "misfinanzas-rc2-qa",
   "version": "2.7.0-rc2",
   "private": true,
-  "scripts": {"test": "node tests/run-integral.cjs && node tests/schedule-engine.test.cjs && node tests/http-smoke.cjs", "test:browser": "playwright test"},
-  "devDependencies": {"@playwright/test": "1.56.1"}
+  "scripts": {
+    "test": "node tests/run-integral.cjs && node tests/schedule-engine.test.cjs && node tests/http-smoke.cjs && node tests/planning.test.cjs",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
 }
