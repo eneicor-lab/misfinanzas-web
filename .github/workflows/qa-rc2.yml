@@ -76,14 +76,14 @@ jobs:
       - run: gradle -p android :app:assembleDebug --no-daemon
       - name: Verify asset parity and APK integrity
         run: |
-          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js; do cmp "web/$f" "android/app/src/main/assets/$f"; done
+          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js module-sync.js; do cmp "web/$f" "android/app/src/main/assets/$f"; done
           mkdir -p artifacts
           cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/MisFinanzas-2.7.0-rc2-debug.apk
           printf '%s\n' '${{ github.sha }}' > artifacts/COMMIT.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging artifacts/*.apk > artifacts/apk-badging.txt
           grep -F 'co.misfinanzas.dev' artifacts/apk-badging.txt
           grep -F 'MisFinanzas' artifacts/apk-badging.txt
-          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js; do unzip -p artifacts/*.apk "assets/$f" | cmp - "web/$f"; done
+          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js module-sync.js; do unzip -p artifacts/*.apk "assets/$f" | cmp - "web/$f"; done
           sha256sum android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png > artifacts/icon-source-sha256.txt
           cd artifacts && sha256sum *.apk | tee SHA256SUMS.txt
       - name: Enable KVM for isolated Android emulator
@@ -137,7 +137,9 @@ jobs:
           mkdir -p evidence
           psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
           psql -v ON_ERROR_STOP=1 -f sql/001_ledger_isolated.sql
+          psql -v ON_ERROR_STOP=1 -f sql/004_module_state.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/ledger.sql 2>&1 | tee evidence/database.log
+          psql -v ON_ERROR_STOP=1 -f tests/database/module_state.sql 2>&1 | tee -a evidence/database.log
           python3 tests/database/concurrency.py 2>&1 | tee -a evidence/database.log
       - name: Restore synthetic database into an isolated database
         run: |
@@ -147,6 +149,9 @@ jobs:
           psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM mf_next.movements t" > evidence/before.json
           PGDATABASE=misfinanzas_restore_qa psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM mf_next.movements t" > evidence/after.json
           cmp evidence/before.json evidence/after.json
+          psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY owner_id,module) FROM mf_next.module_state t" > evidence/modules-before.json
+          PGDATABASE=misfinanzas_restore_qa psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY owner_id,module) FROM mf_next.module_state t" > evidence/modules-after.json
+          cmp evidence/modules-before.json evidence/modules-after.json
           printf '%s\n' 'PASS synthetic dump/restore exact movements comparison' >> evidence/restore.log
       - uses: actions/upload-artifact@v4
         if: always()
