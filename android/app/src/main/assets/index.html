@@ -489,7 +489,7 @@ function updateLocalSummary(){
   {name:'Ingresos del mes · local',value:total('income'),note:'Movimientos guardados en este navegador'},
   {name:'Gastos del mes · local',value:total('expense'),note:'Movimientos guardados en este navegador'}
  ];
- cards.slice(0,4).forEach((card,i)=>{const spec=specs[i],title=card.querySelector('.name'),value=card.querySelector('.value'),note=card.querySelectorAll('.name,.muted');if(title)title.textContent=spec.name;if(value)value.textContent=spec.value===null?'No disponible':money(spec.value);if(note.length>1)note[note.length-1].textContent=spec.note;});
+ Array.from(cards).slice(0,4).forEach((card,i)=>{const spec=specs[i],title=card.querySelector('.name'),value=card.querySelector('.value'),note=card.querySelectorAll('.name,.muted');if(title)title.textContent=spec.name;if(value)value.textContent=spec.value===null?'No disponible':money(spec.value);if(note.length>1)note[note.length-1].textContent=spec.note;});
 }
 function drawList(){const root=$('mf24List');if(!root)return;root.innerHTML=entries.length?entries.slice().reverse().slice(0,100).map(e=>`<div class="mf24-entry"><div><b>${esc(e.concept)}</b><small>${esc(e.date)} · ${esc(e.account)} · ${e.type==='income'?'Ingreso':e.type==='expense'?'Gasto':'Transferencia propia'}</small></div><strong>${e.type==='expense'?'−':e.type==='income'?'+':''}${money(e.amount)}</strong></div>`).join(''):'<div class="mf24-empty">Todavía no hay movimientos registrados.</div>'}
 function renderChart(){const root=$('mf23Chart'), sel=$('mf23Range');if(!root||!sel)return;const count=Number(sel.value)||6;const now=new Date();const months=Array.from({length:count},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-count+1+i,1);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:d.toLocaleDateString('es-CO',{month:'short',year:count===12?'2-digit':undefined}),income:0,expense:0}});const byKey=new Map(months.map(m=>[m.key,m]));for(const e of entries){const m=byKey.get(e.date.slice(0,7));if(m&&e.type!=='transfer')m[e.type]+=e.amount;}
@@ -607,7 +607,7 @@ function persist(next){localStorage.setItem(KEY,JSON.stringify(next));s=next}
 function mf53Mode(){
  const type=el("mf28Type").value;
  el("mf53FromField").hidden=type==="income";
- el("mf53ToField").hidden=type!=="transfer";
+ el("mf53ToField").hidden=type==="expense";
  el("mf53ThirdField").hidden=type==="transfer";
  const input=el("mf53Third");
  input.placeholder=type==="income"?"Ej. Empleador, cliente o persona":"Ej. Tienda, comercio o persona";
