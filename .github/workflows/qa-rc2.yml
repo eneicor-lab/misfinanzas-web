@@ -13,6 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regression:
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +40,15 @@ jobs:
           node-version: '22'
       - run: npm install --ignore-scripts
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
+      - name: Run affected browser scope
+        env:
+          MF_QA_SCOPE: ${{ contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
+        run: |
+          if [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
+            npx playwright test tests/browser/app.spec.cjs --project=mobile --grep 'mock authentication'
+          else
+            npm run test:browser
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -49,6 +58,7 @@ jobs:
             test-results/
             evidence/playwright.json
   android:
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -105,6 +115,7 @@ jobs:
           name: android-rc2-${{ github.sha }}
           path: artifacts/
   database:
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') }}
     runs-on: ubuntu-24.04
     services:
       postgres:
