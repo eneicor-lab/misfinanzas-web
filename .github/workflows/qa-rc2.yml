@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: rc2-qa-${{ github.ref }}
   cancel-in-progress: false
@@ -95,8 +98,20 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
           psql -v ON_ERROR_STOP=1 -f sql/001_ledger_isolated.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/ledger.sql 2>&1 | tee evidence/database.log
+          python3 tests/database/concurrency.py 2>&1 | tee -a evidence/database.log
+      - name: Restore synthetic database into an isolated database
+        run: |
+          pg_dump --no-owner --no-acl > evidence/synthetic.sql
+          createdb misfinanzas_restore_qa
+          PGDATABASE=misfinanzas_restore_qa psql -v ON_ERROR_STOP=1 -f evidence/synthetic.sql > evidence/restore.log
+          psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM mf_next.movements t" > evidence/before.json
+          PGDATABASE=misfinanzas_restore_qa psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM mf_next.movements t" > evidence/after.json
+          cmp evidence/before.json evidence/after.json
+          printf '%s\n' 'PASS synthetic dump/restore exact movements comparison' >> evidence/restore.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: database-${{ github.sha }}
-          path: evidence/database.log
+          path: |
+            evidence/database.log
+            evidence/restore.log
