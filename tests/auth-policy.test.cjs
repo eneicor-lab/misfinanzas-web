@@ -1,0 +1,3 @@
+const assert=require('assert'),S=require('../web/finance-safety.js');
+const cases=[['minimum valid policy','Aa123456789!',true],['short','Aa1!abc',false],['uppercase missing','aa123456789!',false],['lowercase missing','AA123456789!',false],['number missing','Aabcdefghij!',false],['symbol missing','Aa1234567890',false],['control characters rejected','Aa123456789!\n',false],['Unicode case and number support','Áé123456789!',true]];
+for(const [name,value,expected]of cases){assert.equal(S.strongPassword(value),expected,name);console.log('PASS '+name)}console.log('Auth policy: '+cases.length+' passed');

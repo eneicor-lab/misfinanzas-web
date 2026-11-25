@@ -32,6 +32,7 @@
   return !Number.isFinite(created)||now-created<30*86400000;
  }
  function publicKey(k){if(typeof k!=='string'||!k.trim()||/sb_secret_|service_role|PRIVATE KEY/i.test(k))return false;if(k.startsWith('sb_publishable_'))return true;if(k.split('.').length!==3)return false;try{const raw=k.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(atob(raw)).role==='anon';}catch{return false;}}
- const api={MAX,integer,dateOK,today,allocated,outstanding,sum,occurrences,stable,sameRequest,backupKey,notificationVisible,publicKey};
+ function strongPassword(p){return typeof p==='string'&&Array.from(p).length>=12&&Array.from(p).length<=256&&/\p{Lu}/u.test(p)&&/\p{Ll}/u.test(p)&&/\p{N}/u.test(p)&&/[^\p{L}\p{N}\s]/u.test(p)&&!/[\p{Cc}]/u.test(p);}
+ const api={MAX,integer,dateOK,today,allocated,outstanding,sum,occurrences,stable,sameRequest,backupKey,notificationVisible,publicKey,strongPassword};
  root.MF_SAFETY=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
