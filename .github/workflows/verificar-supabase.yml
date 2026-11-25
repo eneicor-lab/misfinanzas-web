@@ -23,7 +23,7 @@ jobs:
       - name: Verificar conexion
         env:
           PGHOST: aws-0-sa-east-1.pooler.supabase.com
-          PGPORT: "5432"
+          PGPORT: "6543"
           PGUSER: postgres.yjzgpspxvmimduuemxms
           PGDATABASE: postgres
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
