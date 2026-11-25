@@ -24,7 +24,7 @@ jobs:
         env:
           PGHOST: aws-0-sa-east-1.pooler.supabase.com
           PGPORT: "5432"
-          PGUSER: postgres.yjzgpspxvmimduuemxms
+          PGUSER: mf_backup.yjzgpspxvmimduuemxms
           PGDATABASE: postgres
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           PGSSLMODE: require
