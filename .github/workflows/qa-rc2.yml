@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regression:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,7 +28,7 @@ jobs:
           name: regression-${{ github.sha }}
           path: evidence/
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,7 +46,7 @@ jobs:
             test-results/
             evidence/playwright.json
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -54,6 +54,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -70,3 +72,31 @@ jobs:
         with:
           name: android-rc2-${{ github.sha }}
           path: artifacts/
+  database:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: misfinanzas_qa
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: synthetic_ci_only
+      PGDATABASE: misfinanzas_qa
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p evidence
+          psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
+          psql -v ON_ERROR_STOP=1 -f sql/001_ledger_isolated.sql
+          psql -v ON_ERROR_STOP=1 -f tests/database/ledger.sql 2>&1 | tee evidence/database.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: database-${{ github.sha }}
+          path: evidence/database.log
