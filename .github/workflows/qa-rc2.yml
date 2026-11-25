@@ -43,9 +43,11 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run affected browser scope
         env:
-          MF_QA_SCOPE: ${{ contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
+          MF_QA_SCOPE: ${{ contains(github.event.head_commit.message, '[sync-only]') && 'sync' || contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
         run: |
-          if [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
+          if [[ "$MF_QA_SCOPE" == 'sync' ]]; then
+            npx playwright test tests/browser/module-sync.spec.cjs
+          elif [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
             npx playwright test tests/browser/app.spec.cjs --project=mobile --grep 'mock authentication'
           else
             npm run test:browser
