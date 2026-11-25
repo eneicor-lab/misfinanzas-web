@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regression:
-    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +32,7 @@ jobs:
           name: regression-${{ github.sha }}
           path: evidence/
   browser:
+    if: ${{ !contains(github.event.head_commit.message, '[database-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +59,7 @@ jobs:
             test-results/
             evidence/playwright.json
   android:
-    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +144,9 @@ jobs:
           python3 tests/database/concurrency.py 2>&1 | tee -a evidence/database.log
       - name: Restore synthetic database into an isolated database
         run: |
-          docker exec '${{ job.services.postgres.id }}' pg_dump -U postgres -d misfinanzas_qa --no-owner --no-acl > evidence/synthetic.sql
+          psql -v ON_ERROR_STOP=1 -f tests/database/restore-fixtures.sql
+          psql -v ON_ERROR_STOP=1 -f tests/database/acl.sql > evidence/acl-before.csv
+          docker exec '${{ job.services.postgres.id }}' pg_dump -U postgres -d misfinanzas_qa --no-owner > evidence/synthetic.sql
           docker exec '${{ job.services.postgres.id }}' createdb -U postgres misfinanzas_restore_qa
           docker exec -i '${{ job.services.postgres.id }}' psql -U postgres -d misfinanzas_restore_qa -v ON_ERROR_STOP=1 < evidence/synthetic.sql > evidence/restore.log
           psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM mf_next.movements t" > evidence/before.json
@@ -152,7 +155,11 @@ jobs:
           psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY owner_id,module) FROM mf_next.module_state t" > evidence/modules-before.json
           PGDATABASE=misfinanzas_restore_qa psql -Atc "SELECT jsonb_agg(to_jsonb(t) ORDER BY owner_id,module) FROM mf_next.module_state t" > evidence/modules-after.json
           cmp evidence/modules-before.json evidence/modules-after.json
+          PGDATABASE=misfinanzas_restore_qa psql -v ON_ERROR_STOP=1 -f tests/database/acl.sql > evidence/acl-after.csv
+          cmp evidence/acl-before.csv evidence/acl-after.csv
+          PGDATABASE=misfinanzas_restore_qa psql -v ON_ERROR_STOP=1 -f tests/database/post-restore.sql 2>&1 | tee -a evidence/restore.log
           printf '%s\n' 'PASS synthetic dump/restore exact movements comparison' >> evidence/restore.log
+          printf '%s\n' 'PASS original synthetic ACL comparison including grants and grantors' >> evidence/restore.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -160,3 +167,5 @@ jobs:
           path: |
             evidence/database.log
             evidence/restore.log
+            evidence/acl-before.csv
+            evidence/acl-after.csv
