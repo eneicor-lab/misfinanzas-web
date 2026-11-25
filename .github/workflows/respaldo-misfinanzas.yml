@@ -1,0 +1,180 @@
+
+name: Respaldo MisFinanzas
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: respaldo-misfinanzas
+  cancel-in-progress: false
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    env:
+      PGHOST: aws-0-sa-east-1.pooler.supabase.com
+      PGPORT: "5432"
+      PGUSER: mf_backup.yjzgpspxvmimduuemxms
+      PGDATABASE: postgres
+      PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PGSSLMODE: require
+      PGCONNECT_TIMEOUT: "15"
+      BACKUP_KEY: ${{ secrets.MF_BACKUP_ENCRYPTION_KEY }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+
+    steps:
+      - name: Preparar herramientas
+        run: |
+          set -euo pipefail
+          pg_dump --version
+          pg_restore --version
+          gpg --version
+
+      - name: Generar y cifrar respaldo
+        run: |
+          set -euo pipefail
+          umask 077
+
+          test -n "$PGPASSWORD"
+          test "${#BACKUP_KEY}" -ge 48
+
+          DIR="$RUNNER_TEMP/mf_backup"
+          mkdir -p "$DIR"
+
+          FILE="$DIR/MisFinanzas_$(date -u +%Y%m%dT%H%M%SZ).dump"
+
+          pg_dump \
+            --format=custom \
+            --enable-row-security \
+            --no-owner \
+            --no-privileges \
+            --no-password \
+            --table=public.mf_accounts \
+            --table=public.mf_allocations \
+            --table=public.mf_audit \
+            --table=public.mf_beneficiaries \
+            --table=public.mf_categories \
+            --table=public.mf_due \
+            --table=public.mf_events \
+            --table=public.mf_notifications \
+            --table=public.mf_obligations \
+            --table=public.mf_tariffs \
+            --file="$FILE"
+
+          test -s "$FILE"
+          pg_restore --list "$FILE" > /dev/null
+
+          printf '%s\n' "$BACKUP_KEY" | gpg \
+            --batch --yes \
+            --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --symmetric \
+            --cipher-algo AES256 \
+            --output "$FILE.gpg" \
+            "$FILE"
+
+          printf '%s\n' "$BACKUP_KEY" | gpg \
+            --batch --yes \
+            --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --decrypt \
+            --output "$DIR/verificacion.dump" \
+            "$FILE.gpg"
+
+          cmp "$FILE" "$DIR/verificacion.dump"
+
+          rm -f "$FILE" "$DIR/verificacion.dump"
+
+          echo "BACKUP_FILE=$FILE.gpg" >> "$GITHUB_ENV"
+          echo "OK: Respaldo generado y cifrado."
+
+      - name: Transferir y verificar Google Drive
+        run: |
+          python3 <<'PY'
+          import os
+          import json
+          import hashlib
+          import urllib.request
+          import urllib.parse
+          import uuid
+          from pathlib import Path
+
+          def request(url, data=None, headers=None):
+              req = urllib.request.Request(
+                  url, data=data, headers=headers or {}
+              )
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  return r.read()
+
+          form = urllib.parse.urlencode({
+              "client_id": os.environ["GOOGLE_CLIENT_ID"],
+              "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
+              "refresh_token": os.environ["GOOGLE_REFRESH_TOKEN"],
+              "grant_type": "refresh_token"
+          }).encode()
+
+          token = json.loads(request(
+              "https://oauth2.googleapis.com/token", form
+          ))["access_token"]
+
+          auth = {"Authorization": "Bearer " + token}
+          file = Path(os.environ["BACKUP_FILE"])
+          content = file.read_bytes()
+
+          boundary = uuid.uuid4().hex
+          metadata = json.dumps({
+              "name": file.name,
+              "mimeType": "application/octet-stream",
+              "appProperties": {
+                  "application": "MisFinanzas",
+                  "type": "encrypted-backup"
+              }
+          }).encode()
+
+          body = (
+              f"--{boundary}\r\n"
+              "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+          ).encode() + metadata + (
+              f"\r\n--{boundary}\r\n"
+              "Content-Type: application/octet-stream\r\n\r\n"
+          ).encode() + content + (
+              f"\r\n--{boundary}--\r\n"
+          ).encode()
+
+          result = json.loads(request(
+              "https://www.googleapis.com/upload/drive/v3/files"
+              "?uploadType=multipart&fields=id,name,size",
+              body,
+              {
+                  **auth,
+                  "Content-Type":
+                      "multipart/related; boundary=" + boundary
+              }
+          ))
+
+          remote = request(
+              "https://www.googleapis.com/drive/v3/files/"
+              + result["id"] + "?alt=media",
+              headers=auth
+          )
+
+          assert hashlib.sha256(content).digest() == \
+                 hashlib.sha256(remote).digest()
+
+          print("OK: Archivo almacenado en Google Drive.")
+          print("OK: Integridad remota verificada mediante SHA-256.")
+          print("Archivo:", file.name)
+          print("Bytes:", len(content))
+          PY
+
+      - name: Limpiar archivos temporales
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/mf_backup"
