@@ -8,14 +8,17 @@ permissions:
 
 jobs:
   verificar:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
 
     steps:
-      - name: Instalar cliente PostgreSQL
+      - name: Preparar PostgreSQL
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y postgresql-client
+          fi
+          psql --version
 
       - name: Verificar conexion
         env:
@@ -28,9 +31,11 @@ jobs:
           PGCONNECT_TIMEOUT: "15"
         run: |
           if [ -z "$PGPASSWORD" ]; then
-            echo "ERROR: Secreto de contraseña no configurado."
+            echo "ERROR: Secreto no configurado."
             exit 1
           fi
+
           psql -X -v ON_ERROR_STOP=1 \
             -c "BEGIN READ ONLY; SELECT 1 AS conexion_ok; ROLLBACK;"
+
           echo "EXITO: Conexion con Supabase verificada."
