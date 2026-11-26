@@ -54,3 +54,13 @@ Source artifact15081591143 contains:
 git diff verified web/ and android/ exactly equal to the tested APK application commit2a7e40e8cdae998abc8a15cee42ce7160684c08b.
 Source package commit8b35aa324b9a2ca94637e5403616d4227ec9d8c1 includes corrected SQL. This follow-up checkpoint is documentation-only.
 Artifacts remain candidate deliverables. No production publication or final acceptance is asserted.
+
+## Read-only project preflight verified on 26 November
+Commit04d573e15bfcfd4f22ac4374e3b2bed70d17491e adds sql/PRECHECK_SUPABASE_READ_ONLY.sql and a focused PostgreSQL17 QA scope.
+https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45811773355 completed successfully.
+The entire script ran with default_transaction_read_only=on; synthetic Auth contents were unchanged. No application, browser or Android changes were made, and their unchanged suites were skipped.
+Evidence artifact15113996589, database-04d573e15bfcfd4f22ac4374e3b2bed70d17491e.
+SQL SHA256a747b69d447f1d6b81ccf69972508a4df1fcedaac2d39b8c23e43e96ed749743.
+The script returns schema/RLS/permission/signature fingerprints and Auth counts, not financial rows or credentials.
+It has NOT been executed against the hosted Supabase project. The optional next step for the project owner is to run this read-only script in the correct project's SQL Editor and inspect its metadata results before any migration decision.
+The previously delivered web/APK application resources and hashes remain unchanged.
