@@ -297,6 +297,7 @@ function nextDue(o,today){
 }
 function load(){try{const a=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(a)?a.filter(o=>o&&typeof o.id==='string'&&typeof o.name==='string'&&dateParts(o.date)):[]}catch(e){return []}}
 let records=load();
+window.addEventListener('mf:module-recovered',event=>{if(event.detail?.module==='reminders'){records=load();editing=null;render()}});
 function save(){try{localStorage.setItem(KEY,JSON.stringify(records));return true}catch(e){$('oblFeedback').textContent='No fue posible guardar en este navegador. Los cambios solo permanecerán durante esta sesión.';return false}}
 function textNode(tag,value){const e=document.createElement(tag);e.textContent=value;return e}
 function action(label,handler){const b=document.createElement('button');b.type='button';b.className='btn ghost';b.textContent=label;b.addEventListener('click',handler);return b}
@@ -345,6 +346,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 function initial(){const categories=[];for(const [type,groups] of Object.entries(DEFAULTS)){for(const [name,subs] of Object.entries(groups)){const id=uid();categories.push({id,type,name,parent:null,active:true});subs.forEach(s=>categories.push({id:uid(),type,name:s,parent:id,active:true}));}}return {categories,people:[{id:uid(),name:'Personal',kind:'persona',active:true},{id:uid(),name:'Todo el hogar',kind:'hogar',active:true}],bills:[]};}
 let state;try{state=JSON.parse(localStorage.getItem(KEY)||'null');if(!state||!Array.isArray(state.categories)||!Array.isArray(state.people)||!Array.isArray(state.bills))throw Error();}catch(e){state=initial();}
 let tab='cats',editCat=null,editPerson=null,editBill=null;
+window.addEventListener('mf:module-recovered',event=>{if(event.detail?.module==='catalogs'){const next=JSON.parse(localStorage.getItem(KEY));if(!next||!Array.isArray(next.categories)||!Array.isArray(next.people)||!Array.isArray(next.bills))throw Error('Catálogos recuperados inválidos');state=next;editCat=editPerson=editBill=null;render()}});
 const format=n=>'$ '+Number(n||0).toLocaleString('es-CO');
 const get=id=>state.categories.find(x=>x.id===id);
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
