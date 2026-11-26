@@ -53,7 +53,7 @@ jobs:
           if [[ "$MF_QA_SCOPE" == 'recurrence' ]]; then
             npx playwright test tests/browser/recurrence.spec.cjs tests/browser/products.spec.cjs --grep 'custom recurrence|all preset|custom subscription|subscriptions and single'
           elif [[ "$MF_QA_SCOPE" == 'unified-ui' ]]; then
-            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs tests/browser/private-vault.spec.cjs
+            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs tests/browser/private-vault.spec.cjs tests/browser/private-logout.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'sync' ]]; then
             npx playwright test tests/browser/module-sync.spec.cjs tests/browser/book-sync.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
