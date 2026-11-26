@@ -8,6 +8,7 @@ auth_bin=$(find /tmp/mf-auth -type f -name auth -print -quit)
 test -n "$auth_bin"
 chmod +x "$auth_bin"
 pg -d postgres -c 'CREATE SCHEMA auth;'
+pg -d postgres -c 'ALTER ROLE postgres SET search_path=auth,public;'
 "$auth_bin" > /tmp/mf-auth-source.log 2>&1 & auth_pid=$!
 cleanup() { kill "${auth_pid:-}" "${restore_pid:-}" 2>/dev/null || true; rm -f evidence/auth-private-session.json; }
 trap cleanup EXIT
