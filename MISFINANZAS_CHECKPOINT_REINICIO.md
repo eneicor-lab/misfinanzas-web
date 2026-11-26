@@ -17,14 +17,6 @@ https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45738213309 (regress
 https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45738386957 (isolated HTTP test: consult result)
 https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45738611254 (may be superseded by next full run)
 
-## Verified application commit 8d1a18ebae9d18b9e598ff33e92257eda2a08efa
-Run https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45739457912:
-44/44 browser cases passed on desktop/mobile; Node/Python regression passed; Android build/parity/emulator passed.
-Source artifact15080930165; inner source ZIP SHA256 d36dbf65d6c0affa68db973d382863fd705e503b2e33cd829c8e1b0609fc2b0b.
-Android artifact15080547487; inner APK SHA256 ebad408ae6e2e9bf39957cd717b60acb0b0e4a9ad659a061f8e764cbb995b5e3.
-SQL book/restore previously passed; the new isolated HTTP job failed at service startup. Inspect completed job139640656643 logs before retrying.
-A following UI change refreshes recovered reminder/catalog screens and validates their basic shape; run its affected tests before accepting it.
-
 ## Exact next operation
 Inspect latest Actions run for this branch; repair any failing tests before release.
 Use artifacts source-<commit>, android-rc2-<commit>, browser-<commit>, database-<commit>, regression-<commit>.
@@ -34,3 +26,12 @@ Android: gradle -p android :app:assembleDebug --no-daemon (Java17, SDK35).
 Keep the original icon and exact attribution: Creado por: Eduardo Neisa Cortés.
 No real financial data or credentials are required by synthetic QA.
 Acceptance and production integration remain with Chat5. No automatic handoff has occurred.
+
+## Continuation after public checkpoint
+Application source commit2a7e40e8cdae998abc8a15cee42ce7160684c08b:
+https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740436079
+Affected synchronization4/4 passed; reminder recovery refresh verified. Android build/assets/emulator passed.
+APK artifact15081480538; inner APK SHA25630c494d374fbf6b8068fd370f8ef2b17c5467c122a7bc4e98d37680d790f6d9a.
+Original icon preserved. Do not confuse this with the artifact ZIP digest.
+The new isolated HTTP concurrency probe found automatic retries on custom SQLSTATE40001. Commitac27f1a50452c3b13b13ab9c24ecd92a0f8bcddd changes application revision conflicts to PT409 in004/006, with SQL/HTTP expectations updated. No remote deployment.
+Next: run the database-only verification for this checkpoint commit, then build final source/web archives without repeating unchanged browser/Android suites.
