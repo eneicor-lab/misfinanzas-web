@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [integration/misfinanzas-2.7-rc2]
-    paths: ['.github/workflows/prepare-signed-android.yml','tools/private_drive.py','tools/qa_signed_android.py','android/app/src/main/java/co/misfinanzas/dev/MainActivity.java']
+    paths: ['.github/workflows/prepare-signed-android.yml','tools/private_drive.py','tools/qa_signed_android.py','android/app/src/main/java/co/misfinanzas/dev/MainActivity.java','web/vault-shell.js','web/supabase-dev.html']
 permissions:
   contents: read
 concurrency:
