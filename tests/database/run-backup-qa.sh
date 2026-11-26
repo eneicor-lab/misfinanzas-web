@@ -62,7 +62,7 @@ SELECT mf_next.validate_book(payload) FROM mf_next.module_state WHERE module='bo
 SQL
 # Historical public-only backup must RESTORE, not merely list archive entries.
 docker exec -e PGPASSWORD=synthetic-backup-only "$MF_QA_CONTAINER" pg_dump -h localhost -U mf_backup -d postgres --schema=public --enable-row-security --format=custom > evidence/historical-public.dump
-docker exec -i "$MF_QA_CONTAINER" pg_restore --list /dev/stdin < evidence/historical-public.dump > evidence/historical.toc
+docker exec -i "$MF_QA_CONTAINER" pg_restore --list < evidence/historical-public.dump > evidence/historical.toc
 docker exec "$MF_QA_CONTAINER" createdb -U postgres mf_historical
 pg -d mf_historical <<'SQL'
 CREATE SCHEMA auth;
