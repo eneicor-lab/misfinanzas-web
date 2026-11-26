@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   regression:
-    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[repair-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[recurrence-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[repair-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -44,9 +44,11 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run affected browser scope
         env:
-          MF_QA_SCOPE: ${{ (contains(github.event.head_commit.message, '[ui-only]') || contains(github.event.head_commit.message, '[client-only]')) && 'unified-ui' || (contains(github.event.head_commit.message, '[sync-only]') || contains(github.event.head_commit.message, '[repair-only]')) && 'sync' || contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
+          MF_QA_SCOPE: ${{ contains(github.event.head_commit.message, '[recurrence-only]') && 'recurrence' || (contains(github.event.head_commit.message, '[ui-only]') || contains(github.event.head_commit.message, '[client-only]')) && 'unified-ui' || (contains(github.event.head_commit.message, '[sync-only]') || contains(github.event.head_commit.message, '[repair-only]')) && 'sync' || contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
         run: |
-          if [[ "$MF_QA_SCOPE" == 'unified-ui' ]]; then
+          if [[ "$MF_QA_SCOPE" == 'recurrence' ]]; then
+            npx playwright test tests/browser/recurrence.spec.cjs tests/browser/products.spec.cjs --grep 'custom recurrence|all preset|custom subscription|subscriptions and single'
+          elif [[ "$MF_QA_SCOPE" == 'unified-ui' ]]; then
             npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'sync' ]]; then
             npx playwright test tests/browser/module-sync.spec.cjs tests/browser/book-sync.spec.cjs
@@ -124,7 +126,7 @@ jobs:
           name: android-rc2-${{ github.sha }}
           path: artifacts/
   database:
-    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') && !contains(github.event.head_commit.message, '[client-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[recurrence-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') && !contains(github.event.head_commit.message, '[client-only]') }}
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -218,7 +220,7 @@ jobs:
             evidence/acl-after.csv
 
   source:
-    if: ${{ !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[recurrence-only]') && !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -237,4 +239,3 @@ jobs:
             artifacts/SOURCE_COMMIT.txt
             artifacts/APK_APP_PARITY.txt
             artifacts/SOURCE_SHA256SUMS.txt
-
