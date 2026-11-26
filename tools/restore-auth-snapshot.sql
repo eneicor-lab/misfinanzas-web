@@ -4,7 +4,7 @@
 BEGIN;
 SELECT set_config('mf.restore_auth_snapshot',:'auth_snapshot',true) AS ignored \gset
 DO $$
-DECLARE snapshot jsonb:=current_setting('mf.restore_auth_snapshot')::jsonb;columns_data jsonb;row_data jsonb;t text;names text;owner uuid;
+DECLARE snapshot jsonb:=current_setting('mf.restore_auth_snapshot')::jsonb;columns_data jsonb;row_data jsonb;t text;names text;owner uuid;token_column text;
 BEGIN
  IF snapshot->'format' IS DISTINCT FROM '1'::jsonb OR snapshot->'sessions_excluded' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION 'Unsupported Auth snapshot'; END IF;
  IF EXISTS(SELECT 1 FROM auth.users) OR EXISTS(SELECT 1 FROM auth.identities) THEN RAISE EXCEPTION 'Auth restore target is not empty'; END IF;
@@ -21,6 +21,14 @@ BEGIN
    IF (t='users' AND ((row_data->>'id')::uuid IS DISTINCT FROM owner OR row_data->>'email_confirmed_at' IS NULL))
     OR (t='identities' AND (row_data->>'user_id')::uuid IS DISTINCT FROM owner) THEN RAISE EXCEPTION 'Auth snapshot owner mismatch'; END IF;
    IF t='users' AND EXISTS(SELECT 1 FROM jsonb_array_elements_text(snapshot->'excluded_token_columns') x WHERE row_data ? x) THEN RAISE EXCEPTION 'Transient Auth token in snapshot'; END IF;
+   -- Managed Auth versions may require token columns without an empty default.
+   -- Restore the empty token only; never revive a confirmation or recovery token.
+   IF t='users' THEN
+    FOR token_column IN SELECT a.attname FROM pg_attribute a WHERE a.attrelid='auth.users'::regclass AND a.attnum>0 AND NOT a.attisdropped
+     AND a.attgenerated='' AND a.attname IN ('confirmation_token','recovery_token','email_change_token_new','email_change_token_current','phone_change_token','reauthentication_token') LOOP
+     row_data:=row_data||jsonb_build_object(token_column,'');
+    END LOOP;
+   END IF;
    SELECT string_agg(quote_ident(a.attname),',' ORDER BY a.attnum) INTO names
     FROM pg_attribute a WHERE a.attrelid=format('auth.%I',t)::regclass AND a.attnum>0 AND NOT a.attisdropped
      AND a.attgenerated='' AND a.attidentity<>'a' AND row_data ? a.attname;

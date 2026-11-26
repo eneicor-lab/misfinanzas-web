@@ -7,6 +7,7 @@ pg() { docker exec -i "$MF_QA_CONTAINER" psql -X -q -v ON_ERROR_STOP=1 -U postgr
 auth_bin=$(find /tmp/mf-auth -type f -name auth -print -quit)
 test -n "$auth_bin"
 chmod +x "$auth_bin"
+pg -d postgres -c 'CREATE SCHEMA auth;'
 "$auth_bin" > /tmp/mf-auth-source.log 2>&1 & auth_pid=$!
 cleanup() { kill "${auth_pid:-}" "${restore_pid:-}" 2>/dev/null || true; rm -f evidence/auth-private-session.json; }
 trap cleanup EXIT
@@ -16,7 +17,7 @@ kill "$auth_pid"; wait "$auth_pid" || true
 pg -d postgres <<'SQL'
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
-CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO authenticated,anon;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated,anon;
 SQL
@@ -49,6 +50,7 @@ for name,info in m['files'].items():
  assert len(data)==info['bytes'] and hashlib.sha256(data).hexdigest()==info['sha256'],'Recovered bundle integrity failed'
 PY
 docker exec "$MF_QA_CONTAINER" createdb -U postgres mf_real_auth_restore
+pg -d mf_real_auth_restore -c 'CREATE SCHEMA auth;'
 # Boot the same verified service/migrations against an EMPTY isolated target, then stop.
 DATABASE_URL=postgres://postgres:synthetic-auth-db-only@localhost:5432/mf_real_auth_restore \
  PORT=10000 GOTRUE_API_PORT=10000 API_EXTERNAL_URL=http://127.0.0.1:10000 \
@@ -65,7 +67,7 @@ PY
 kill "$restore_pid"; wait "$restore_pid" || true
 pg -d mf_real_auth_restore -v auth_snapshot="$(cat /tmp/mf-auth-recovered/auth-source.json)" -f /project/tools/restore-auth-snapshot.sql
 pg -d mf_real_auth_restore <<'SQL'
-CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO authenticated,anon;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated,anon;
 CREATE SCHEMA extensions;

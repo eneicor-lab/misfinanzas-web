@@ -1,6 +1,6 @@
 /* Explicit, conflict-preserving synchronization adapter. Financial posting is outside this adapter. */
 (function(root){'use strict';
- const KEYS={planning:'misfinanzas_planning_v1',catalogs:'minorte_v17_catalogo',reminders:'presupuesto_demo_obligaciones_v12'},META='misfinanzas_sync_versions_v1';
+ const KEYS={planning:'misfinanzas_planning_v1',catalogs:'minorte_v17_catalogo',reminders:'presupuesto_demo_obligaciones_v12',preferences:'misfinanzas_preferences_v1',notifications:'misfinanzas_v25_alerts_demo'},META='misfinanzas_sync_versions_v1';
  class Conflict extends Error{constructor(){super('Conflicto de sincronización: conserva ambas versiones y resuelve explícitamente');this.name='SyncConflict'}}
  const stable=x=>JSON.stringify(x,function(k,v){return v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(key=>[key,v[key]])):v});
  function validate(payload){if(!payload||typeof payload!=='object')throw Error('Estado de módulo inválido');const s=JSON.stringify(payload);if(new TextEncoder().encode(s).length>1048576)throw Error('Estado de módulo excede el límite');JSON.stringify(payload,(k,v)=>{if(/^(?:password|access_token|refresh_token|service_role|secret)$/i.test(k))throw Error('Credenciales excluidas de sincronización');return v});return payload}
