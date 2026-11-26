@@ -12,7 +12,7 @@ SELECT 'POLICY|'||schemaname||'.'||tablename||'|'||policyname||'|'||permissive||
  FROM pg_policies WHERE schemaname IN ('public','mf_next') ORDER BY 1;
 SELECT 'FUNCTION|'||p.oid::regprocedure::text||'|'||pg_get_userbyid(p.proowner)||'|'||coalesce(p.proacl::text,'')||'|'||pg_get_functiondef(p.oid)
  FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='mf_next' OR (n.nspname='public' AND left(p.proname,3)='mf_') ORDER BY 1;
-SELECT 'TRIGGER|'||tgrelid::regclass::text||'|'||pg_get_triggerdef(oid)||'|'||tgenabled FROM pg_trigger
+SELECT 'TRIGGER|'||tgrelid::regclass::text||'|'||pg_get_triggerdef(oid)||'|'||tgenabled::text FROM pg_trigger
  WHERE NOT tgisinternal AND tgrelid IN(SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','mf_next')) ORDER BY 1;
 SELECT 'INDEX|'||schemaname||'.'||tablename||'|'||indexname||'|'||indexdef FROM pg_indexes WHERE schemaname IN ('public','mf_next') ORDER BY 1;
 SELECT format('SELECT %L || COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text,''[]'') FROM %I.%I t;',
@@ -20,3 +20,4 @@ SELECT format('SELECT %L || COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t):
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','mf_next') AND c.relkind IN ('r','p') ORDER BY n.nspname,c.relname \gexec
 SELECT format('SELECT %L || last_value || ''|'' || is_called FROM %I.%I;', 'SEQUENCE|'||schemaname||'.'||sequencename||'|',schemaname,sequencename)
  FROM pg_sequences WHERE schemaname IN ('public','mf_next') ORDER BY schemaname,sequencename \gexec
+
