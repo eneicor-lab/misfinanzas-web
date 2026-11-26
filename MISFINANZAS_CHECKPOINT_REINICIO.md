@@ -26,3 +26,18 @@ main, publicación actual y workflow activo de respaldo permanecen preservados. 
 Validar instalación y conservación de datos del APK release firmado; completar respaldo candidato consistente con ambos esquemas y Auth, mantener su workflow inactivo; completar persistencia de preferencias/notificaciones/períodos y notificaciones nativas; comprobar Auth con servicio efímero; actualizar matrices, manuales y paquete integral después de los controles afectados. Reutilizar evidencias válidas.
 
 Los runs intermedios fallidos/cancelados y sus correcciones están conservados en el historial de Actions. Revisar logs, nunca inferir aprobación por existencia de un artifact. El checkpoint privado contiene el detalle operativo y las rutas locales; no se publica documentación privada aquí.
+
+
+## Continuity update 2026-11-26 15:06 America/Bogota
+
+Mission MF-WORK-LIBERACION-20261126-D. Candidate 2.7.0-rc2, NOT production-certified. Main and active backup remain protected; PR2 remains draft.
+
+Verified consolidated QA: run45887326622 on5596f71344e5445ed2829403d9401dbdffbb8a05 passed all jobs: 58 browser cases, Node/Python regression, isolated PostgreSQL/PostgREST and restore, Android build/install/native notification, source/web package integrity. Preferences/agenda and notification read-state sync are included. Private vault uses encrypted local storage and requests remote logout before decrypted frame teardown. Remote financial writes remain gated.
+
+Official isolated GoTrue+captured SMTP and consistent financial/Auth recovery passed run45886469377. Verified signup/email confirmation, password complexity/recovery, preserved identity/password, previous JWT epoch rejection, excluded refresh sessions and logout. This is synthetic QA; hosted provider/JWT/SMTP/MFA configuration is not certified. Full financial/historical recovery passed45843015184 and45885469786; reversible legacy asset migration passed45844682956. Complex legacy debt contracts remain blocked rather than inferred or discarded.
+
+Stable signed release run45886635594 passed UI open/lock/reinstall and original icon parity; APK SHA256 dcc99913c61d7959b6abca66a474af3899d231948ffcacb61831d87cde57956a. Latest application logout update is in run45887574532 atddfdda349d6e2f1501b32c9d1cbbf9f8edcfaa4d. First attempt compiled/verified but emulator Pixel Launcher ANR blocked UI; one targeted rerun is pending. Do not mark that latest signed installation approved until observed. App files equal tested5596; subsequent commits are workflow/continuity only, verified by application diff.
+
+Read-only hosted compatibility remains blocked on the verified public Supabase CA input. System trust failed TLS; attempted old public download URL returned404. No TLS downgrade. No hosted identity/financial rows queried. Require the dashboard CA certificate and re-run only the compatibility check. No installation/migration/activation in hosted production.
+
+Next operation: inspect45887574532 latest attempt; preserve signed artifact and hashes after actual UI result. Recover latest source/web package and compare manifests with APK assets. Private checkpoint/manuals/matrices and preparatory restricted procedures are delivered separately. Supervisor must review critical hosted backup/migration/configuration and authorize production integration before merge/release. No automatic handoff or acceptance.
