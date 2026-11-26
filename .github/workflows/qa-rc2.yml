@@ -205,6 +205,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - run: git fetch --depth=1 origin 2a7e40e8cdae998abc8a15cee42ce7160684c08b
       - run: python tools/package-source.py
       - uses: actions/upload-artifact@v4
         with:
@@ -214,4 +215,5 @@ jobs:
             artifacts/*-web.zip
             artifacts/MANIFIESTO_SHA256.json
             artifacts/SOURCE_COMMIT.txt
+            artifacts/APK_APP_PARITY.txt
             artifacts/SOURCE_SHA256SUMS.txt

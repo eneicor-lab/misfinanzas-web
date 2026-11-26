@@ -1,0 +1,11 @@
+caso,estado,alcance,evidencia
+NAVEGADOR_COMPLETO,PASS,44 casos escritorio y móvil,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45739457912
+SINCRONIZACION_AFECTADA,PASS,4 casos y recuperación de obligaciones,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740436079
+REGRESION,PASS,Node y Python34 y candidata5,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740034239
+APK,PASS,Compilación paridad e instalación-arranque API35 con libro válido,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740436079
+POSTGRESQL,PASS,RLS CAS historial e integridad de libro,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740902902
+POSTGREST_HTTP,PASS,Una escritura concurrente y HTTP409 finito sin reintento cíclico,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740902902
+RESTAURACION_AISLADA,PASS,Movimientos libro ACL secuencias y trigger de tabla vacía,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740902902
+ICONO,PASS,Original sin rediseño y presente en APK,https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740436079
+SUPABASE_REAL,NO_EJECUTADO,Pruebas aisladas no equivalen a servicio real,Sin cambios en proyecto remoto
+PUBLICACION_PRODUCCION,NO_EJECUTADO,main y raíz publicados preservados,PR2 en borrador

@@ -3,8 +3,10 @@ import hashlib,json,pathlib,re,subprocess,zipfile
 root=pathlib.Path(__file__).resolve().parents[1]
 tracked=subprocess.check_output(['git','ls-files','-z'],cwd=root).decode().split('\0')
 prefixes=('web/','android/','sql/','tests/','tools/')
-fixed={'package.json','playwright.config.cjs','.github/workflows/qa-rc2.yml','.github/workflows/respaldo-misfinanzas.yml','docs/ALCANCE_MONOUSUARIO.md','INICIAR_MISFINANZAS_DEV.ps1','INICIAR_MISFINANZAS_DEV.cmd','MISFINANZAS_CHECKPOINT_REINICIO.md'}
+fixed={'package.json','playwright.config.cjs','.github/workflows/qa-rc2.yml','.github/workflows/respaldo-misfinanzas.yml','docs/ALCANCE_MONOUSUARIO.md','docs/QA_CANDIDATA.csv','INICIAR_MISFINANZAS_DEV.ps1','INICIAR_MISFINANZAS_DEV.cmd','MISFINANZAS_CHECKPOINT_REINICIO.md'}
 files=sorted(p for p in tracked if p and (p.startswith(prefixes) or p in fixed))
+apk_commit='2a7e40e8cdae998abc8a15cee42ce7160684c08b'
+subprocess.run(['git','diff','--exit-code',apk_commit,'HEAD','--','web','android'],cwd=root,check=True)
 commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
 patterns=[rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY',rb'\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}',rb'\bsb_secret_[A-Za-z0-9_-]{12,}']
 manifest=[]
@@ -14,13 +16,15 @@ for name in files:
  manifest.append({'path':name,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
 out=root/'artifacts';out.mkdir(exist_ok=True)
 name='MisFinanzas-2.7.0-rc2-'+commit[:12]+'-source.zip'
-manifest_bytes=json.dumps({'version':'2.7.0-rc2','commit':commit,'files':manifest},ensure_ascii=False,indent=2).encode()
+manifest_bytes=json.dumps({'version':'2.7.0-rc2','commit':commit,'tested_apk_app_commit':apk_commit,'initial_candidate_zip_sha256':'e42bdbce71bb734dc1b4800a017501c935c58b5bf4ee2abe538773b219be5c7d','files':manifest},ensure_ascii=False,indent=2).encode()
 (out/'MANIFIESTO_SHA256.json').write_bytes(manifest_bytes)
 (out/'SOURCE_COMMIT.txt').write_text(commit+'\n')
+(out/'APK_APP_PARITY.txt').write_text('PASS web/android application files equal to tested APK commit '+apk_commit+'\nSource package commit '+commit+'\n')
 with zipfile.ZipFile(out/name,'w',zipfile.ZIP_DEFLATED) as z:
  for entry in manifest:z.write(root/entry['path'],entry['path'])
  z.writestr('MANIFIESTO_SHA256.json',manifest_bytes)
  z.writestr('SOURCE_COMMIT.txt',commit+'\n')
+ z.writestr('APK_APP_PARITY.txt',(out/'APK_APP_PARITY.txt').read_text())
 with zipfile.ZipFile(out/name) as z:
  for entry in manifest:assert hashlib.sha256(z.read(entry['path'])).hexdigest()==entry['sha256']
 digest=hashlib.sha256((out/name).read_bytes()).hexdigest()

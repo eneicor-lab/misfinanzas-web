@@ -1,37 +1,45 @@
 # MISFINANZAS_CHECKPOINT_REINICIO
-Public source checkpoint. Version 2.7.0-rc2; integration/misfinanzas-2.7-rc2.
-This file contains only public repository and test references. Private operational notes are excluded.
-Supervisor: Chat 5, MisFinanzas.
-No main merge or production publication was performed. This is an unreleased candidate.
+Public source checkpoint, updated 2026-11-25 21:15:01 GMT−5, America/Bogota.
+Mission MF-WORK-LIBERACION-20261125-B; continuation MF-WORK-REANUDACION-20261125-C.
+Version2.7.0-rc2; integration/misfinanzas-2.7-rc2. Supervisor Chat5. Unreleased candidate.
+This file contains only public technical references. It is not production acceptance.
 
-## Source
-Recover this branch at its latest commit; do not recreate the original candidate.
-The latest application change before this checkpoint is cde2d5a344f1fa06aaa9167a226d17ad4ae4b2c7 (embedded mobile logout).
-Previous changes: unified financial book, explicit installment counts, typed explicit synchronization, isolated PostgreSQL validation.
+## Recoverable source
+Use the latest commit of this branch and its source artifact. Do not reconstruct RC2.
+Original RC2 ZIP:345580bytes; SHA256 e42bdbce71bb734dc1b4800a017501c935c58b5bf4ee2abe538773b219be5c7d.
+Application files verified at2a7e40e8cdae998abc8a15cee42ce7160684c08b.
+Current SQL fix verified atc1f9ee7ddcfa8a2f9008a69691cda935ede35721.
+main preserved at762d66b409a7e4f9c6b2e0ae833eb05017d42ae5.
+Draft PR: https://github.com/eneicor-lab/misfinanzas-web/pull/2.
 
-## Evidence
-https://github.com/eneicor-lab/misfinanzas-web/pull/2 (draft)
-https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45737321538 (SQL/isolated restore passed)
-https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45737795602 (regression/SQL/Android passed; browser40passed/2failed, subsequently corrected)
-https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45738213309 (regression/Android passed; browser31passed/1failed embedded logout, subsequently corrected)
-https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45738386957 (isolated HTTP test: consult result)
-https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45738611254 (may be superseded by next full run)
+## Verified results
+44/44 full browser cases desktop/mobile: run45739457912.
+4/4 affected synchronization cases, including refreshed recovered reminders: run45740436079.
+Node/Python regression and candidate checks: run45740034239 (source before one isolated UI date correction; affected browser cases repeated afterward).
+New debug APK build, web asset parity, installation, activity startup, Web Locks and valid canonical book: run45740436079.
+PostgreSQL17 and real PostgREST12.2.3 localhost: run45740902902 PASS. Concurrency gives exactly one write and finite HTTP409. Financial tampering, other-identity writes, direct table writes and anonymous reads denied.
+Isolated dump/restore exact contents, original ACL/grantors, sequence state and empty-table trigger: run45740902902 PASS.
+Application revision conflicts use PT409 in004/006;40001 is reserved for actual database serialization failures. No hosted migration applied.
 
-## Exact next operation
-Inspect latest Actions run for this branch; repair any failing tests before release.
-Use artifacts source-<commit>, android-rc2-<commit>, browser-<commit>, database-<commit>, regression-<commit>.
-The source artifact contains a ZIP, SHA256 manifest and SOURCE_COMMIT.txt. Android includes SHA256SUMS.txt and COMMIT.txt.
-Commands: npm test; npm run test:browser; python -m unittest discover -s tests -v; python tests/check_candidate.py.
-Android: gradle -p android :app:assembleDebug --no-daemon (Java17, SDK35).
-Keep the original icon and exact attribution: Creado por: Eduardo Neisa Cortés.
-No real financial data or credentials are required by synthetic QA.
-Acceptance and production integration remain with Chat5. No automatic handoff has occurred.
+## Artifacts and integrity
+APK source commit2a7e40e8cdae998abc8a15cee42ce7160684c08b.
+APK artifact15081480538, run45740436079; inner APK SHA25630c494d374fbf6b8068fd370f8ef2b17c5467c122a7bc4e98d37680d790f6d9a.
+Original icon source SHA2562d3ea14e55f5aa5896212b63ec239ad9142d79349658744363818cb7b8f6a78b.
+Database evidence artifact15081605366, run45740902902.
+Final package job creates source and flat web ZIPs with manifests; it verifies web/android application files equal the tested APK commit. Inspect its successful result before reporting final ZIP hashes.
+Do not confuse artifact wrapper ZIP digests with inner APK/source/web digests.
 
-## Continuation after public checkpoint
-Application source commit2a7e40e8cdae998abc8a15cee42ce7160684c08b:
-https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45740436079
-Affected synchronization4/4 passed; reminder recovery refresh verified. Android build/assets/emulator passed.
-APK artifact15081480538; inner APK SHA25630c494d374fbf6b8068fd370f8ef2b17c5467c122a7bc4e98d37680d790f6d9a.
-Original icon preserved. Do not confuse this with the artifact ZIP digest.
-The new isolated HTTP concurrency probe found automatic retries on custom SQLSTATE40001. Commitac27f1a50452c3b13b13ab9c24ecd92a0f8bcddd changes application revision conflicts to PT409 in004/006, with SQL/HTTP expectations updated. No remote deployment.
-Next: run the database-only verification for this checkpoint commit, then build final source/web archives without repeating unchanged browser/Android suites.
+## Commands and next operation
+Next: verify package-only Actions run for the commit containing this checkpoint; download its source artifact and validate SOURCE_SHA256SUMS.txt and APK_APP_PARITY.txt.
+node tools/serve.cjs ; npm test ; npm run test:browser.
+python -m unittest discover -s tests -v ; python tests/check_candidate.py.
+Android Java17/SDK35: gradle -p android :app:assembleDebug --no-daemon.
+Do not repeat unchanged suites; execute affected cases after a change.
+
+## Release boundary
+The web root and backup workflow are preserved. No main merge, production deployment, real financial writes or remote restoration occurred.
+SQL003/005/007 contain writes without deleting;006/006b validate the book,009 binds the verified owner,008 enables only after acceptance.
+No automatic financial movement is generated by reminders or reservations. One titular; no collaborative administration.
+Creado por: Eduardo Neisa Cortés.
+Preserve the original icon. APK is debug; no production certification is claimed.
+Final integration belongs exclusively to Chat5. No automatic handoff occurred.
