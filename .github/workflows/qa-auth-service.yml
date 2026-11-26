@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [integration/misfinanzas-2.7-rc2]
-    paths: ['.github/workflows/qa-auth-service.yml','tests/auth_service.py','tests/database/run-real-auth-qa.sh']
+    paths: ['.github/workflows/qa-auth-service.yml','tests/auth_service.py','tests/database/run-real-auth-qa.sh','tools/restore-auth-snapshot.sql','tools/backup_snapshot.py']
 permissions:
   contents: read
 concurrency:
