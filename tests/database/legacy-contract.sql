@@ -3,7 +3,8 @@
 -- Missing source nullability/type lengths are NOT claimed verified; COP uses char(3).
 -- Audit identity is a synthetic fixture choice, not a certified production sequence definition.
 CREATE ROLE mf_backup LOGIN PASSWORD 'synthetic-backup-only';
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 CREATE TABLE public."mf_accounts" (
  "active" boolean DEFAULT true,
  "created_at" timestamp with time zone DEFAULT now(),
@@ -291,3 +292,4 @@ GRANT EXECUTE ON FUNCTION public.mf_post_basic(text,date,text,uuid,uuid,bigint,t
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 -- Six trigger names/tables were not present in metadata: synthetic trigger exercises the actual function on accounts only.
 CREATE TRIGGER qa_protect_owner BEFORE UPDATE ON public.mf_accounts FOR EACH ROW EXECUTE FUNCTION public.mf_reject_owner_change();
+
