@@ -21,6 +21,7 @@ pg -d postgres -f /project/sql/010_backup_candidate_read_only.sql
 pg -d postgres -f /project/sql/010_backup_candidate_read_only.sql
 pg -d postgres -f /project/tests/database/backup-permissions.sql
 pg -q -d postgres -f /project/tests/database/backup-inventory.sql > evidence/source.inventory
+pg -q -d postgres -f /project/tests/database/backup-schema-acl.sql > evidence/schema-acl.sql
 docker exec -e PGPASSWORD=synthetic-backup-only "$MF_QA_CONTAINER" pg_dump -h localhost -U mf_backup -d postgres --schema=public --schema=mf_next --enable-row-security --format=custom > evidence/financial.dump
 sha256sum evidence/financial.dump > evidence/plain.sha256
 # Synthetic encryption key is generated for this run, never uploaded or reused for production.
@@ -42,6 +43,7 @@ CREATE SCHEMA extensions;
 CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 SQL
 docker exec -i "$MF_QA_CONTAINER" pg_restore -U postgres --exit-on-error -d mf_restore < evidence/recovered.dump
+pg -d mf_restore < evidence/schema-acl.sql
 pg -q -d mf_restore -f /project/tests/database/backup-inventory.sql > evidence/restored.inventory
 if ! diff -u evidence/source.inventory evidence/restored.inventory > evidence/restore.diff; then
  cat evidence/restore.diff
@@ -73,6 +75,7 @@ CREATE SCHEMA extensions;
 CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 SQL
 docker exec -i "$MF_QA_CONTAINER" pg_restore -U postgres --exit-on-error -d mf_historical < evidence/historical-public.dump
+grep 'ON SCHEMA public ' evidence/schema-acl.sql | pg -d mf_historical
 pg -d mf_historical <<'SQL'
 DO $$ BEGIN
  IF (SELECT count(*) FROM public.mf_accounts)<>2 OR (SELECT count(*) FROM public.mf_events)<>2 THEN RAISE EXCEPTION 'Historical restore incomplete'; END IF;
