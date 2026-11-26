@@ -25,6 +25,7 @@ jobs:
           python-version: '3.12'
       - run: mkdir -p evidence && npm test 2>&1 | tee evidence/node.log
       - run: node tests/reminder-compatibility.test.cjs 2>&1 | tee evidence/reminder-compatibility.log
+      - run: node tests/preferences.test.cjs 2>&1 | tee evidence/preferences.log
       - run: node tests/private-vault.test.cjs 2>&1 | tee evidence/private-vault.log
       - run: node tools/check-assets.cjs 2>&1 | tee evidence/asset-parity.log
       - run: python -m unittest discover -s tests -v 2>&1 | tee evidence/python.log
@@ -222,6 +223,7 @@ jobs:
             evidence/acl-after.csv
 
   source:
+    needs: [regression, browser, android, database]
     if: ${{ !contains(github.event.head_commit.message, '[recurrence-only]') && !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
@@ -229,8 +231,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: git fetch --depth=1 origin 2a7e40e8cdae998abc8a15cee42ce7160684c08b
       - run: python tools/package-source.py
+        env:
+          MF_TESTED_APK_COMMIT: ${{ github.sha }}
       - uses: actions/upload-artifact@v4
         with:
           name: source-${{ github.sha }}
