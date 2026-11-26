@@ -1,66 +1,28 @@
-# MISFINANZAS_CHECKPOINT_REINICIO
-Public source checkpoint, updated 2026-11-25 21:15:01 GMT−5, America/Bogota.
-Mission MF-WORK-LIBERACION-20261125-B; continuation MF-WORK-REANUDACION-20261125-C.
-Version2.7.0-rc2; integration/misfinanzas-2.7-rc2. Supervisor Chat5. Unreleased candidate.
-This file contains only public technical references. It is not production acceptance.
+# MisFinanzas — checkpoint técnico de integración
 
-## Recoverable source
-Use the latest commit of this branch and its source artifact. Do not reconstruct RC2.
-Original RC2 ZIP:345580bytes; SHA256 e42bdbce71bb734dc1b4800a017501c935c58b5bf4ee2abe538773b219be5c7d.
-Application files verified at2a7e40e8cdae998abc8a15cee42ce7160684c08b.
-Current SQL fix verified atc1f9ee7ddcfa8a2f9008a69691cda935ede35721.
-main preserved at762d66b409a7e4f9c6b2e0ae833eb05017d42ae5.
-Draft PR: https://github.com/eneicor-lab/misfinanzas-web/pull/2.
+Misión MF-WORK-LIBERACION-20261126-D. Autoridad de aceptación: Chat 5. Estado: EN EJECUCIÓN; preparación de liberación. Actualización 26/11/2026, Colombia.
 
-## Verified results
-44/44 full browser cases desktop/mobile: run45739457912.
-4/4 affected synchronization cases, including refreshed recovered reminders: run45740436079.
-Node/Python regression and candidate checks: run45740034239 (source before one isolated UI date correction; affected browser cases repeated afterward).
-New debug APK build, web asset parity, installation, activity startup, Web Locks and valid canonical book: run45740436079.
-PostgreSQL17 and real PostgREST12.2.3 localhost: run45740902902 PASS. Concurrency gives exactly one write and finite HTTP409. Financial tampering, other-identity writes, direct table writes and anonymous reads denied.
-Isolated dump/restore exact contents, original ACL/grantors, sequence state and empty-table trigger: run45740902902 PASS.
-Application revision conflicts use PT409 in004/006;40001 is reserved for actual database serialization failures. No hosted migration applied.
+Rama: integration/misfinanzas-2.7-rc2. PR 2 en borrador. Base protegida de main: 762d66b409a7e4f9c6b2e0ae833eb05017d42ae5. Inicio D: 3991314b039c8534c68bff739e585a8162756458. Aplicación privada probada: d5fed5c20cdbd71d7c8f698175bb2b33d977eddc. Candidata firmada: 95d664a1a7435122591cca4478779229ebc60b49. Consultar HEAD vigente antes de escribir.
 
-## Artifacts and integrity
-APK source commit2a7e40e8cdae998abc8a15cee42ce7160684c08b.
-APK artifact15081480538, run45740436079; inner APK SHA25630c494d374fbf6b8068fd370f8ef2b17c5467c122a7bc4e98d37680d790f6d9a.
-Original icon source SHA2562d3ea14e55f5aa5896212b63ec239ad9142d79349658744363818cb7b8f6a78b.
-Database evidence artifact15081605366, run45740902902.
-Final package job creates source and flat web ZIPs with manifests; it verifies web/android application files equal the tested APK commit. Inspect its successful result before reporting final ZIP hashes.
-Do not confuse artifact wrapper ZIP digests with inner APK/source/web digests.
+## Evidencias aprobadas
 
-## Commands and next operation
-Next: verify package-only Actions run for the commit containing this checkpoint; download its source artifact and validate SOURCE_SHA256SUMS.txt and APK_APP_PARITY.txt.
-node tools/serve.cjs ; npm test ; npm run test:browser.
-python -m unittest discover -s tests -v ; python tests/check_candidate.py.
-Android Java17/SDK35: gradle -p android :app:assembleDebug --no-daemon.
-Do not repeat unchanged suites; execute affected cases after a change.
+- Respaldo financiero completo y restauración de public/mf_next, ACL, propietarios, RLS, restricciones, índices, funciones, triggers y secuencias: Actions 45843015184. Restauración histórica public-only incluida.
+- Migración administrativa limitada a activos legados: Actions 45844682956. Exportación, SHA-256, saldos, discriminaciones, catálogos, agenda, fuente inmutable, idempotencia y reversión protegida. Los productos de deuda sin contrato suficiente quedan bloqueados conservando sus filas.
+- Identidades Auth y verificador de contraseña con vínculos financieros: Actions 45845399001. Tokens transitorios excluidos; recuperación con esquema compatible. Servicio GoTrue/SMTP/proveedores y MFA requieren validación específica.
+- Privacidad local: Actions 45848896956, 46 casos de navegador aprobados, regresión Node/Python/candidata aprobada, 9 grupos de bóveda aprobados, 29 recursos web/Android idénticos. Android instalado y arrancado en emulador con almacenamiento cifrado comprobado.
+- APK debug de esa prueba SHA-256: 53e482ea37afb329298285ba594933ee79f8baaddb5890b6c13e65a5e5d55641. Artifact 15134290122 del run 45848896956.
+- APK con firma estable: Actions 45849972250. Clave recuperada desde almacenamiento privado cifrado con relectura verificada. Certificado SHA-256: 08da57bab4097f2ae71f4093a14d220e44c660f456a152ee01f8d224ab73d94b. Artifact 15132887184. Instalación específica de release todavía pendiente de automatizar.
 
-## Release boundary
-The web root and backup workflow are preserved. No main merge, production deployment, real financial writes or remote restoration occurred.
-SQL003/005/007 contain writes without deleting;006/006b validate the book,009 binds the verified owner,008 enables only after acceptance.
-No automatic financial movement is generated by reminders or reservations. One titular; no collaborative administration.
-Creado por: Eduardo Neisa Cortés.
-Preserve the original icon. APK is debug; no production certification is claimed.
-Final integration belongs exclusively to Chat5. No automatic handoff occurred.
+## Estado técnico y controles
 
-## Delivery confirmed
-Package-only run https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45741180095 completed successfully.
-Source artifact15081591143 contains:
-- MisFinanzas-2.7.0-rc2-8b35aa324b9a-source.zip — SHA2565bc6aedaee94cd1de01bc094018a6313792cdd9fd708305e88a6a8ca014427e0.
-- MisFinanzas-2.7.0-rc2-8b35aa324b9a-web.zip — SHA256a248be0ca0c8530c629225cdf46d744b22bc6e51f7fcefb3e0edb666ccbe9c62.
-- MANIFIESTO_SHA256.json, SOURCE_SHA256SUMS.txt, SOURCE_COMMIT.txt and APK_APP_PARITY.txt.
-104 source files re-read and verified; flat web ZIP includes index.html and matching resources.
-git diff verified web/ and android/ exactly equal to the tested APK application commit2a7e40e8cdae998abc8a15cee42ce7160684c08b.
-Source package commit8b35aa324b9a2ca94637e5403616d4227ec9d8c1 includes corrected SQL. This follow-up checkpoint is documentation-only.
-Artifacts remain candidate deliverables. No production publication or final acceptance is asserted.
+index.html contiene el acceso privado; app.html preserva los módulos y exige la bóveda abierta. AES-GCM y PBKDF2-SHA256, exclusión de pestañas simultáneas, bloqueo al ocultar/inactividad y persistencia cifrada atómica. La identidad remota se vincula a la bóveda. El servidor local de QA separa las pruebas sintéticas de componentes de los casos reales de acceso privado.
 
-## Read-only project preflight verified on 26 November
-Commit04d573e15bfcfd4f22ac4374e3b2bed70d17491e adds sql/PRECHECK_SUPABASE_READ_ONLY.sql and a focused PostgreSQL17 QA scope.
-https://github.com/eneicor-lab/misfinanzas-web/actions/runs/45811773355 completed successfully.
-The entire script ran with default_transaction_read_only=on; synthetic Auth contents were unchanged. No application, browser or Android changes were made, and their unchanged suites were skipped.
-Evidence artifact15113996589, database-04d573e15bfcfd4f22ac4374e3b2bed70d17491e.
-SQL SHA256a747b69d447f1d6b81ccf69972508a4df1fcedaac2d39b8c23e43e96ed749743.
-The script returns schema/RLS/permission/signature fingerprints and Auth counts, not financial rows or credentials.
-It has NOT been executed against the hosted Supabase project. The optional next step for the project owner is to run this read-only script in the correct project's SQL Editor and inspect its metadata results before any migration decision.
-The previously delivered web/APK application resources and hashes remain unchanged.
+Ícono original conservado: SHA-256 2d3ea14e55f5aa5896212b63ec239ad9142d79349658744363818cb7b8f6a78b. Atribución: Creado por: Eduardo Neisa Cortés.
+
+main, publicación actual y workflow activo de respaldo permanecen preservados. No se ejecutaron migraciones, restauraciones ni escrituras financieras sobre Supabase real. book_sync requiere aceptación y activación administrativa; esta misión no lo habilita remotamente.
+
+## Próxima operación
+
+Validar instalación y conservación de datos del APK release firmado; completar respaldo candidato consistente con ambos esquemas y Auth, mantener su workflow inactivo; completar persistencia de preferencias/notificaciones/períodos y notificaciones nativas; comprobar Auth con servicio efímero; actualizar matrices, manuales y paquete integral después de los controles afectados. Reutilizar evidencias válidas.
+
+Los runs intermedios fallidos/cancelados y sus correcciones están conservados en el historial de Actions. Revisar logs, nunca inferir aprobación por existencia de un artifact. El checkpoint privado contiene el detalle operativo y las rutas locales; no se publica documentación privada aquí.
