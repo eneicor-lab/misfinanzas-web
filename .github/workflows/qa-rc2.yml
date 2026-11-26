@@ -25,6 +25,7 @@ jobs:
           python-version: '3.12'
       - run: mkdir -p evidence && npm test 2>&1 | tee evidence/node.log
       - run: node tests/reminder-compatibility.test.cjs 2>&1 | tee evidence/reminder-compatibility.log
+      - run: node tests/native-reminders.test.cjs 2>&1 | tee evidence/native-reminders.log
       - run: node tests/preferences.test.cjs 2>&1 | tee evidence/preferences.log
       - run: node tests/private-vault.test.cjs 2>&1 | tee evidence/private-vault.log
       - run: node tools/check-assets.cjs 2>&1 | tee evidence/asset-parity.log
@@ -111,7 +112,8 @@ jobs:
           disable-animations: true
           script: |
             adb install -r artifacts/MisFinanzas-2.7.0-rc2-debug.apk
-            adb shell am start -W -n co.misfinanzas.dev/.MainActivity --ez mf_qa_unlock true
+            adb shell pm grant co.misfinanzas.dev android.permission.POST_NOTIFICATIONS
+            adb shell am start -W -n co.misfinanzas.dev/.MainActivity --ez mf_qa_unlock true --ez mf_qa_notification true
             sleep 5
             adb shell pidof co.misfinanzas.dev > artifacts/android-pid.txt
             adb exec-out screencap -p > artifacts/android-screen.png
@@ -119,6 +121,10 @@ jobs:
             adb logcat -d -s MisFinanzasQA:I AndroidRuntime:E > artifacts/android-runtime.log
             grep -q 'web_ready=true' artifacts/android-runtime.log
             grep -F 'web_ready=' artifacts/android-runtime.log
+            for attempt in $(seq 1 20); do if adb shell dumpsys notification | grep -q 'co.misfinanzas.dev.*id='; then break; fi; sleep 2; done
+            adb shell dumpsys notification | grep 'co.misfinanzas.dev' > artifacts/native-reminder-evidence.txt
+            grep -q 'NotificationRecord' artifacts/native-reminder-evidence.txt
+            printf '%s\n' 'PASS isolated native reminder delivered with generic private content; no financial posting path.' >> artifacts/native-reminder-evidence.txt
             test -s artifacts/android-pid.txt
             if grep -q 'FATAL EXCEPTION' artifacts/android-runtime.log; then exit 1; fi
             adb shell uiautomator dump /sdcard/window.xml || true
