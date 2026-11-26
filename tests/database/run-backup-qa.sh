@@ -3,6 +3,7 @@ set -euo pipefail
 # Ephemeral QA only. Same PG17 container supplies server AND client, no host apt install.
 : "${MF_QA_CONTAINER:?Set PostgreSQL service container ID}"
 mkdir -p evidence
+node tests/test-owner-binding.cjs
 docker cp . "$MF_QA_CONTAINER:/project"
 pg() { docker exec -i "$MF_QA_CONTAINER" psql -X -v ON_ERROR_STOP=1 -U postgres "$@"; }
 node tests/make-book-fixture.cjs
@@ -11,6 +12,7 @@ pg -d postgres -f /project/tests/database/legacy-contract.sql
 for f in 001_ledger_isolated.sql 004_module_state.sql 006_book_state.sql 006b_book_replay.sql; do
  pg -d postgres -f "/project/sql/$f"
 done
+pg -d postgres -f /project/evidence/test-owner-binding.sql
 pg -d postgres -v book_fixture="$(cat evidence/book-book.json)" -v next_fixture="$(cat evidence/book-next.json)" -v fresh_fixture="$(cat evidence/book-fresh.json)" -f /project/tests/database/book_state.sql
 pg -d postgres -f /project/sql/007_disable_book_sync.sql
 pg -d postgres -f /project/tests/database/backup-data.sql
@@ -35,7 +37,9 @@ CREATE TABLE auth.users(id uuid PRIMARY KEY,email_confirmed_at timestamptz DEFAU
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claim.sub',true),''),nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO authenticated,anon;
 INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
-CREATE EXTENSION pgcrypto;
+DROP SCHEMA public;
+CREATE SCHEMA extensions;
+CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 SQL
 docker exec -i "$MF_QA_CONTAINER" pg_restore -U postgres --exit-on-error -d mf_restore < evidence/recovered.dump
 pg -q -d mf_restore -f /project/tests/database/backup-inventory.sql > evidence/restored.inventory
@@ -61,7 +65,9 @@ CREATE TABLE auth.users(id uuid PRIMARY KEY,email_confirmed_at timestamptz DEFAU
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claim.sub',true),''),nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO authenticated,anon;
 INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
-CREATE EXTENSION pgcrypto;
+DROP SCHEMA public;
+CREATE SCHEMA extensions;
+CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 SQL
 docker exec -i "$MF_QA_CONTAINER" pg_restore -U postgres --exit-on-error -d mf_historical < evidence/historical-public.dump
 pg -d mf_historical <<'SQL'
