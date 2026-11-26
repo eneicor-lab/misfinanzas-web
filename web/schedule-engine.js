@@ -159,7 +159,19 @@ function remindersForDay(schedule, todayISO, leadDays = [7, 3, 1], overdueWindow
   return notices;
 }
 
+// Compatibility boundary for persisted UI records; no financial events are produced.
+function fromReminder(record) {
+  if(!record || typeof record !== 'object') throw new TypeError('Recordatorio inválido');
+  const map={once:['once',1],daily:['day',1],weekly:['week',1],monthly:['month',1],bimonthly:['month',2],quarterly:['month',3],semiannual:['month',6],yearly:['year',1]};
+  const pair=map[record.type];
+  if(!pair && record.type!=='custom') throw new TypeError('Frecuencia del recordatorio no admitida');
+  const schedule={id:record.id,firstDue:record.date,unit:pair?pair[0]:record.unit,every:pair?pair[1]:record.every,status:record.cancelled?'cancelled':record.paused?'paused':'active'};
+  if(record.endDate) schedule.endDate=record.endDate;
+  validateSchedule(schedule);return schedule;
+}
+
 const api = {
+  fromReminder,
   addMonthsAnchored,
   daysBetween,
   dueDates,
