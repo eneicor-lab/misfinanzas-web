@@ -42,7 +42,10 @@ jobs:
           cmd += [env['CLIENT_CONTAINER'],'psql','-X','-qAt','-v','ON_ERROR_STOP=1']
           sql="BEGIN READ ONLY; SELECT jsonb_build_object('postgres_major',current_setting('server_version_num')::int/10000,'restricted_backup_role',current_user='mf_backup'); ROLLBACK;"
           result=subprocess.run(cmd,input=sql,text=True,capture_output=True,env=env,timeout=90)
-          if result.returncode:raise RuntimeError('Read-only client compatibility check failed; exit '+str(result.returncode))
+          if result.returncode:
+              error=result.stderr.lower()
+              category='TLS_CERTIFICATE' if 'certificate' in error or 'ssl' in error else 'AUTHENTICATION' if 'authentication' in error or 'password' in error else 'DNS' if 'resolve' in error or 'translate host' in error else 'CONNECTIVITY' if 'connect' in error or 'timeout' in error else 'CLIENT_ERROR'
+              raise RuntimeError('Read-only compatibility blocked: '+category+'; exit '+str(result.returncode)+'; private connection details suppressed')
           data=json.loads(result.stdout)
           if data.get('restricted_backup_role') is not True:raise RuntimeError('Expected restricted backup role')
           major=data.get('postgres_major')
