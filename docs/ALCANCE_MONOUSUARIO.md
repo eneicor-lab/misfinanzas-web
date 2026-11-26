@@ -1,13 +1,27 @@
-# MisFinanzas — alcance monousuario aprobado (2026-11-23)
+# MisFinanzas — alcance monousuario y uso de la candidata
+Un solo titular consulta, registra y valida sus finanzas. No se ofrecen usuarios colaboradores, invitaciones ni administración multiusuario.
+Creado por: Eduardo Neisa Cortés.
 
-## Titular y experiencia
-La aplicación es exclusivamente personal. Un solo titular consulta, registra y valida sus finanzas, con experiencia de banca personal. No ofrecer alta de otros usuarios, invitaciones, roles, permisos delegados, administradores de usuarios ni colaboración.
+## Uso
+Servir web/ con node tools/serve.cjs y abrir http://127.0.0.1:8765. Evitar file://: el libro necesita un origen seguro y Web Locks.
+Configuración permite cuentas bancarias y efectivo. Movimientos registra ingresos, gastos y transferencias; categorías/beneficiarios y componentes deben reconciliar el total en COP enteros.
+Deudas comparte saldos con ese mismo libro: compras/cuotas, préstamos, intereses/cargos, pagos explícitos y negociación. Indicar cuotas previamente pagadas y cuotas cubiertas por el nuevo pago;0 permite abonos o intereses sin avanzar cuotas.
+Capital pagado reduce deuda y efectivo; no duplica consumo. Compras con tarjeta cuentan una sola vez. Los recordatorios, suscripciones y reservas no generan movimientos automáticamente.
+Planificación incorpora presupuestos por categoría/mes, metas y reservas; el resumen presenta saldos y consumo del libro. Los escenarios históricos siguen separados y conservados.
 
-## Seguridad no negociable
-Conservar autenticación robusta, recuperación de acceso verificada, cierre de sesión, controles de sesión y políticas de propiedad de datos (RLS). La existencia de pruebas de aislamiento entre identidades de prueba NO implica habilitar cuentas de terceros en la interfaz.
+## Sincronización y recuperación
+Abrir consulta Supabase e iniciar sesión con correo verificado. Contraseña de12caracteres mínimo con mayúscula/minúscula/número/símbolo. Usar solo URL y clave pública. Contraseñas/tokens no se persisten.
+La sincronización es explícita por módulo: libro, planificación, categorías/beneficiarios, obligaciones/suscripciones. Envía solo después de confirmación y de que el servidor valide titular y habilitación. No es una orden bancaria.
+Una revisión remota en conflicto no reemplaza datos silenciosamente. Recuperar una versión distinta requiere confirmación y conserva una copia local previa. Respaldar cifrado antes de cualquier cambio; exportación JSON del laboratorio no está cifrada.
+Cerrar sesión revoca localmente y solicita cierre remoto. Recuperación por correo requiere enlace verificado del proveedor; seguir instrucciones del formulario. No compartir credenciales.
+Las pruebas usan datos sintéticos; no introducir finanzas reales hasta la aceptación.
 
-## Arquitectura y pendientes reales
-La candidata contiene una interfaz local de demostración y un módulo Supabase DEV de consulta aislada. No confundir ambas fuentes ni afirmar sincronización integral. Escrituras remotas bloqueadas hasta verificar esquema, respaldo y pruebas seguras sin tocar datos reales. Pendientes: integración de cuentas, movimientos, tarjetas, obligaciones, recurrencias, presupuestos, notificaciones y respaldos; sincronización web-Android, recuperación, APK y E2E.
+## Android y verificación
+Compilar con Java17/SDK35: gradle -p android :app:assembleDebug --no-daemon. La APK candidata debug conserva el ícono original y recursos web; verificar COMMIT.txt/SHA256SUMS.txt del artifact.
+No desinstalar una instalación con datos para resolver diferencias de firma. La APK debug no es una versión de producción.
+npm test; npm run test:browser; python -m unittest discover -s tests -v; python tests/check_candidate.py.
+Actions entrega evidencias de navegador, PostgreSQL/PostgREST aislado, restauración y emulador; solo declarar aprobadas las ejecuciones concluidas satisfactoriamente.
 
-## Criterio de aceptación
-Una sola identidad titular, cero interfaces de gestión multiusuario, integridad contable, persistencia remota verificada, pruebas de regresión y seguridad, recuperación y publicación web + Android comprobadas. No declarar producción hasta contar con evidencia.
+## Entrega y aceptación
+El ZIP source contiene MANIFIESTO_SHA256.json y SOURCE_COMMIT.txt. La raíz publicada y main se conservan. Este código es una candidata no liberada; pruebas aisladas no acreditan el servicio real ni autorizan publicar producción.
+La aceptación y la integración corresponden aChat5.
