@@ -9,7 +9,7 @@ defaults:
   run:
     shell: bash
 concurrency:
-  group: rc2-qa-${{ github.ref }}
+  group: rc2-qa-${{ github.ref }}-${{ contains(github.event.head_commit.message, '[backup-only]') && 'backup-skip' || 'app' }}
   cancel-in-progress: true
 jobs:
   regression:
@@ -24,7 +24,6 @@ jobs:
         with:
           python-version: '3.12'
       - run: mkdir -p evidence && npm test 2>&1 | tee evidence/node.log
-      - run: node tests/reminder-compatibility.test.cjs 2>&1 | tee evidence/reminder-compatibility.log
       - run: node tests/reminder-compatibility.test.cjs 2>&1 | tee evidence/reminder-compatibility.log
       - run: python -m unittest discover -s tests -v 2>&1 | tee evidence/python.log
       - run: python tests/check_candidate.py 2>&1 | tee evidence/candidate.log
@@ -219,7 +218,7 @@ jobs:
             evidence/acl-after.csv
 
   source:
-    if: ${{ !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
