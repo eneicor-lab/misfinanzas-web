@@ -43,7 +43,7 @@ CREATE OR REPLACE FUNCTION mf_next.apply_legacy_plan(p_plan jsonb,p_verified_bac
 DECLARE titular uuid;snapshot jsonb;source_hash text;plan_hash text;existing mf_next.legacy_imports%ROWTYPE;
  book jsonb;r record;e jsonb;a jsonb;m text;payload jsonb;modules jsonb:='{}';n bigint;
 BEGIN
- IF jsonb_typeof(p_plan) IS DISTINCT FROM 'object' OR p_plan->'version' IS DISTINCT FROM '1'::jsonb OR p_plan->'ready' IS DISTINCT FROM 'true'::jsonb OR p_plan->'blockers' IS DISTINCT FROM '[]'::jsonb
+ IF jsonb_typeof(p_plan) IS DISTINCT FROM 'object' OR p_plan->'scope' IS DISTINCT FROM '"legacy_assets_only"'::jsonb OR p_plan->'version' IS DISTINCT FROM '1'::jsonb OR p_plan->'ready' IS DISTINCT FROM 'true'::jsonb OR p_plan->'blockers' IS DISTINCT FROM '[]'::jsonb
   OR p_verified_backup_sha256 IS NULL OR p_verified_backup_sha256!~'^[0-9a-f]{64}$' THEN RAISE EXCEPTION 'Reviewed ready plan and verified backup digest required'; END IF;
  titular:=(p_plan->>'owner_id')::uuid;
  PERFORM pg_advisory_xact_lock(hashtextextended(titular::text,817263));

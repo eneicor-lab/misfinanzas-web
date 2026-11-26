@@ -216,12 +216,12 @@ DECLARE
  v_kind text;
  v_balance bigint;
 BEGIN
- IF v_owner IS NULL THEN RAISE EXCEPTION 'Autenticaci�n requerida' USING ERRCODE='28000'; END IF;
- IF p_key IS NULL OR length(p_key) NOT BETWEEN 1 AND 180 THEN RAISE EXCEPTION 'Clave de idempotencia inv�lida'; END IF;
- IF p_date IS NULL OR p_date > CURRENT_DATE THEN RAISE EXCEPTION 'Fecha inv�lida o futura'; END IF;
+ IF v_owner IS NULL THEN RAISE EXCEPTION 'Autenticación requerida' USING ERRCODE='28000'; END IF;
+ IF p_key IS NULL OR length(p_key) NOT BETWEEN 1 AND 180 THEN RAISE EXCEPTION 'Clave de idempotencia inválida'; END IF;
+ IF p_date IS NULL OR p_date > CURRENT_DATE THEN RAISE EXCEPTION 'Fecha inválida o futura'; END IF;
  IF p_type IS NULL OR p_type NOT IN ('income','expense','transfer') THEN RAISE EXCEPTION 'Tipo de movimiento no permitido'; END IF;
- IF p_amount IS NULL OR p_amount <= 0 THEN RAISE EXCEPTION 'Importe inv�lido'; END IF;
- IF p_concept IS NULL OR length(trim(p_concept)) NOT BETWEEN 1 AND 300 THEN RAISE EXCEPTION 'Concepto inv�lido'; END IF;
+ IF p_amount IS NULL OR p_amount <= 0 THEN RAISE EXCEPTION 'Importe inválido'; END IF;
+ IF p_concept IS NULL OR length(trim(p_concept)) NOT BETWEEN 1 AND 300 THEN RAISE EXCEPTION 'Concepto inválido'; END IF;
  IF (p_type='income' AND (p_from IS NOT NULL OR p_to IS NULL))
  OR (p_type='expense' AND (p_from IS NULL OR p_to IS NOT NULL))
  OR (p_type='transfer' AND (p_from IS NULL OR p_to IS NULL OR p_from=p_to)) THEN
@@ -241,7 +241,7 @@ BEGIN
   END IF;
   RAISE EXCEPTION 'Clave de idempotencia reutilizada con datos diferentes';
  END IF;
- -- Esta primera RPC solo admite cuentas de activo, no tarjetas ni pr�stamos.
+ -- Esta primera RPC solo admite cuentas de activo, no tarjetas ni préstamos.
  IF p_from IS NOT NULL THEN
   SELECT kind INTO v_kind FROM public.mf_accounts
   WHERE id=p_from AND owner_id=v_owner AND active=true;
@@ -292,4 +292,3 @@ GRANT EXECUTE ON FUNCTION public.mf_post_basic(text,date,text,uuid,uuid,bigint,t
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 -- Six trigger names/tables were not present in metadata: synthetic trigger exercises the actual function on accounts only.
 CREATE TRIGGER qa_protect_owner BEFORE UPDATE ON public.mf_accounts FOR EACH ROW EXECUTE FUNCTION public.mf_reject_owner_change();
-

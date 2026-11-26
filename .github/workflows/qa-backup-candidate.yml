@@ -7,6 +7,10 @@ on:
       - '.github/workflows/qa-backup-candidate.yml'
       - 'sql/010_backup_candidate_read_only.sql'
       - 'sql/009b_bind_sole_verified_owner_sql_editor.sql'
+      - 'sql/011_legacy_migration_candidate.sql'
+      - 'sql/012_legacy_migration_revert_candidate.sql'
+      - 'tools/legacy-migrate.cjs'
+      - 'tests/database/migration-state.sql'
       - 'tests/database/backup-*'
       - 'tests/database/run-backup-qa.sh'
       - 'tests/database/legacy-contract.sql'
@@ -50,5 +54,5 @@ jobs:
             evidence/*.sha256
             evidence/*.gpg
             evidence/*.toc
+            evidence/schema-acl.sql
           retention-days: 30
-
