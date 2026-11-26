@@ -10,7 +10,7 @@ defaults:
     shell: bash
 concurrency:
   group: rc2-qa-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   regression:
     if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
@@ -157,8 +157,15 @@ jobs:
           node tests/make-book-fixture.cjs
           psql -v ON_ERROR_STOP=1 -v book_fixture="$(cat evidence/book-book.json)" -v next_fixture="$(cat evidence/book-next.json)" -v fresh_fixture="$(cat evidence/book-fresh.json)" -f tests/database/book_state.sql 2>&1 | tee -a evidence/database.log
       - name: Exercise real HTTP book persistence in isolated PostgREST
+        timeout-minutes: 3
         run: |
-          docker run -d --name mf-postgrest-qa --network host -e PGRST_DB_URI=postgres://postgres:synthetic_ci_only@127.0.0.1:5432/misfinanzas_qa -e PGRST_DB_SCHEMAS=mf_next -e PGRST_DB_ANON_ROLE=anon -e PGRST_JWT_SECRET=synthetic_postgrest_ci_signing_key_never_production_2026 -e PGRST_SERVER_PORT=3001 -e PGRST_SERVER_HOST=127.0.0.1 postgrest/postgrest:v12.2.3
+          mkdir -p /tmp/mf-postgrest
+          curl -fL --connect-timeout 10 --max-time 60 'https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz' -o /tmp/mf-postgrest/postgrest.tar.xz
+          tar -xJf /tmp/mf-postgrest/postgrest.tar.xz -C /tmp/mf-postgrest
+          export PGRST_DB_URI=postgres://postgres:synthetic_ci_only@127.0.0.1:5432/misfinanzas_qa PGRST_DB_SCHEMAS=mf_next PGRST_DB_ANON_ROLE=anon PGRST_JWT_SECRET=synthetic_postgrest_ci_signing_key_never_production_2026 PGRST_SERVER_PORT=3001 PGRST_SERVER_HOST=127.0.0.1
+          /tmp/mf-postgrest/postgrest > evidence/postgrest.log 2>&1 &
+          postgrest_pid=$!
+          trap 'kill "$postgrest_pid" 2>/dev/null || true' EXIT
           node tests/database/book-http.cjs 2>&1 | tee evidence/book-http.log
       - name: Restore synthetic database into an isolated database
         run: |
@@ -183,6 +190,7 @@ jobs:
         with:
           name: database-${{ github.sha }}
           path: |
+            evidence/postgrest.log
             evidence/book-http.log
             evidence/database.log
             evidence/restore.log
