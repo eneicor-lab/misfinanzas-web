@@ -1,0 +1,2 @@
+const fs=require('fs'),path=require('path'),{pathToFileURL}=require('url');
+module.exports=async()=>{const file=path.join(__dirname,'../web/private-vault.js'),aes=pathToFileURL(path.join(__dirname,'../web/vendor/noble-ciphers/aes.js')).href,source=fs.readFileSync(file,'utf8').replace("'./vendor/noble-ciphers/aes.js'",JSON.stringify(aes));return import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));};

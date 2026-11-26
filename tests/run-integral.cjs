@@ -1,7 +1,7 @@
 /* Runtime domain regression; no external packages, DB, browser or real financial data. */
 const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert'),crypto=require('crypto');
 const root=path.resolve(__dirname,'..'),S=require('../web/finance-safety.js');
-const html=fs.readFileSync(path.join(root,'web/index.html'),'utf8');
+const html=fs.readFileSync(path.join(root,'web/app.html'),'utf8');
 const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].map(m=>({attrs:m[1],code:m[2]}));
 const tests=[];function test(name,fn){tests.push({name,fn})}const equal=(a,b)=>assert.deepStrictEqual(JSON.parse(JSON.stringify(a)),JSON.parse(JSON.stringify(b)));
 const ctx={console,MF_SAFETY:S,structuredClone:x=>JSON.parse(JSON.stringify(x))};ctx.window=ctx;ctx.globalThis=ctx;vm.createContext(ctx);

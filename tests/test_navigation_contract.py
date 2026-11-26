@@ -9,7 +9,7 @@ class IDs(HTMLParser):
   if tag=='section' and 'id' in a:self.sections.append(a['id'])
 class NavigationContract(unittest.TestCase):
  def test_sections_and_admin(self):
-  html=(ROOT/'web/index.html').read_text(encoding='utf-8');p=IDs();p.feed(html)
+  html=(ROOT/'web/app.html').read_text(encoding='utf-8');p=IDs();p.feed(html)
   for key in ('inicio','movimientos','planificacion','deudas','ahorros','configuracion','catalogos','administracion','acerca'):
    self.assertIn(key,p.sections)
   self.assertIn('Creado por: Eduardo Neisa Cortés',html)
@@ -23,5 +23,5 @@ class NavigationContract(unittest.TestCase):
   self.assertIn('android.permission.INTERNET',manifest)
   self.assertIn('android:usesCleartextTraffic="false"',manifest)
  def test_single_ui_source(self):
-  self.assertEqual((ROOT/'web/index.html').read_bytes(),(ROOT/'android/app/src/main/assets/index.html').read_bytes())
+  self.assertEqual((ROOT/'web/app.html').read_bytes(),(ROOT/'android/app/src/main/assets/app.html').read_bytes())
 if __name__=='__main__':unittest.main()

@@ -3,10 +3,10 @@ import unittest
 P=Path(__file__).resolve().parents[1]
 class ConnectionV08(unittest.TestCase):
  def test_shared_html(self):
-  for f in ('index.html','supabase-dev.html'):
+  for f in ('app.html','supabase-dev.html'):
    self.assertEqual((P/'web'/f).read_bytes(),(P/'android/app/src/main/assets'/f).read_bytes())
  def test_info_unique(self):
-  s=(P/'web/index.html').read_text(encoding='utf-8')
+  s=(P/'web/app.html').read_text(encoding='utf-8')
   self.assertIn("['acerca','info','Acerca de']",s)
   self.assertIn('"info": "<svg',s)
   self.assertIn('M12 16v-4',s)
@@ -16,7 +16,7 @@ class ConnectionV08(unittest.TestCase):
   self.assertIn("method!=='GET' && path.startsWith('/rest/v1/')",s)
   self.assertIn('/auth/v1/token?grant_type=password',s)
  def test_explicit_dev_guard(self):
-  s=(P/'web/index.html').read_text(encoding='utf-8')
+  s=(P/'web/app.html').read_text(encoding='utf-8')
   self.assertIn('id="mfdev-confirm"',s)
   self.assertIn('id="mfdev-open" disabled',s)
  def test_android_internet(self):

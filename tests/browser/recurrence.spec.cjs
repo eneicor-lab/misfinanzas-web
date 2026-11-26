@@ -21,7 +21,7 @@ test('all preset frequencies and invalid end date are checked through the form',
 });
 test('custom subscription synchronizes to another device and restores the same upcoming date',async({browser})=>{
  let remote=null;const contexts=[];
- async function client(){const ctx=await browser.newContext();contexts.push(ctx);const p=await ctx.newPage();await p.goto('http://127.0.0.1:8765/');await p.evaluate(()=>navTo('obligaciones'));return p;}
+ async function client(){const ctx=await browser.newContext({extraHTTPHeaders:{"X-MisFinanzas-Component-QA":"synthetic-component-only"}});contexts.push(ctx);const p=await ctx.newPage();await p.goto('http://127.0.0.1:8765/');await p.evaluate(()=>navTo('obligaciones'));return p;}
  try{const a=await client(),b=await client();
   await a.locator('#oblName').fill('QA suscripción semestral');await a.locator('#oblType').selectOption('semiannual');await a.locator('#oblDate').fill('2027-01-31');await a.locator('#oblEndDate').fill('2028-12-31');await a.locator('#obligationForm button[type=submit]').click();
   const exported=await a.evaluate(async()=>{let data;const s=new MF_MODULE_SYNC.Sync({storage:localStorage,sessionId:()=> 'synthetic-owner',allowWrites:true,transport:{put:async(m,r,p)=>{data={revision:r+1,payload:p};return r+1}}});await s.push('reminders');return data});remote=exported;

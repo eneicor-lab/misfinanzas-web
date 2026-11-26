@@ -9,6 +9,7 @@ import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
+import android.view.WindowManager;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler;
 
@@ -17,6 +18,7 @@ public final class MainActivity extends Activity {
     private WebView webView;
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         webView = new WebView(this);
         setContentView(webView);
         WebSettings settings = webView.getSettings();
@@ -34,9 +36,7 @@ public final class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 boolean debug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
                 if (debug && "https://appassets.androidplatform.net/assets/index.html".equals(url)) {
-                    view.evaluateJavascript(
-                        "(function(){try{return Boolean(window.isSecureContext && navigator.locks && window.MF_APP_STORE && MF_APP_ENGINE.check(MF_APP_STORE.read().state) && document.getElementById('mfUnifiedOverview'))}catch(e){return false}})()",
-                        result -> Log.i("MisFinanzasQA", "web_ready=" + result));
+                    probePrivateApp(0);
                 }
             }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -47,6 +47,20 @@ public final class MainActivity extends Activity {
             }
         });
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+    }
+    /** Synthetic local-only probe requires an explicit debug intent; never runs in release. */
+    private void probePrivateApp(int attempt) {
+        boolean debug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        if (!debug || !getIntent().getBooleanExtra("mf_qa_unlock", false) || webView == null) return;
+        webView.evaluateJavascript(
+            "(function(){try{if(!window.MF_VAULT_READY)return false;var f=document.getElementById('vaultForm');if(!MF_VAULT.unlocked&&!f.dataset.qaSubmitted){f.dataset.qaSubmitted='true';document.getElementById('vaultPassword').value='Synthetic+Vault!123';document.getElementById('vaultConfirmation').value='Synthetic+Vault!123';f.requestSubmit();return false;}if(!window.MF_APP_READY)return false;MF_VAULT.storage.setItem('mf_qa_privacy_probe','SYNTHETIC_PRIVATE_PROBE');var raw=localStorage.getItem('mf_private_vault_v1'),a=document.getElementById('mfPrivateApp').contentWindow;return Boolean(window.isSecureContext&&navigator.locks&&raw&&!raw.includes('SYNTHETIC_PRIVATE_PROBE')&&localStorage.getItem('mf_qa_privacy_probe')===null&&a.MF_APP_ENGINE.check(a.MF_APP_STORE.read().state))}catch(e){return false}})()",
+            result -> { if ("true".equals(result)) Log.i("MisFinanzasQA", "web_ready=true encrypted_storage=true");
+                else if (attempt < 25 && webView != null) webView.postDelayed(() -> probePrivateApp(attempt + 1), 500);
+                else Log.i("MisFinanzasQA", "web_ready=false"); });
+    }
+    @Override protected void onPause() {
+        if (webView != null) webView.evaluateJavascript("if(window.MF_PRIVATE_LOCK)MF_PRIVATE_LOCK()", null);
+        super.onPause();
     }
     /** Preserve the same in-app navigation behavior as the web version. */
     @Override public void onBackPressed() {

@@ -3,7 +3,7 @@ import re, unittest
 ROOT=Path(__file__).resolve().parents[1]
 class TestV12(unittest.TestCase):
  def test_web_android_same(self):
-  for n in ('index.html','supabase-dev.html'):
+  for n in ('app.html','supabase-dev.html'):
    self.assertEqual((ROOT/'web'/n).read_bytes(),(ROOT/'android/app/src/main/assets'/n).read_bytes())
  def test_read_only_remote(self):
   s=(ROOT/'web/supabase-dev.html').read_text(encoding='utf-8')
