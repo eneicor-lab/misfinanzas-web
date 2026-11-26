@@ -25,6 +25,9 @@ jobs:
           CLIENT_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set -euo pipefail
+          curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' https://supabase.com/prod-ca-2021.crt -o /tmp/mf-supabase-root.crt
+          openssl x509 -in /tmp/mf-supabase-root.crt -noout -checkend 86400
+          docker cp /tmp/mf-supabase-root.crt "$CLIENT_CONTAINER:/tmp/mf-supabase-root.crt"
           python3 - <<'PY'
           import os,re,subprocess,json
           from pathlib import Path
@@ -36,7 +39,7 @@ jobs:
               value=match.group(1).strip().strip('"\'')
               if not re.fullmatch(r'[A-Za-z0-9._-]+',value):raise RuntimeError('Invalid connection metadata')
               env[name]=value
-          env['PGSSLMODE']='verify-full';env['PGSSLROOTCERT']='system';env['PGCONNECT_TIMEOUT']='15'
+          env['PGSSLMODE']='verify-full';env['PGSSLROOTCERT']='/tmp/mf-supabase-root.crt';env['PGCONNECT_TIMEOUT']='15'
           cmd=['docker','exec','-i']
           for name in ['PGHOST','PGPORT','PGUSER','PGDATABASE','PGPASSWORD','PGSSLMODE','PGSSLROOTCERT','PGCONNECT_TIMEOUT']:cmd+=['-e',name]
           cmd += [env['CLIENT_CONTAINER'],'psql','-X','-qAt','-v','ON_ERROR_STOP=1']
