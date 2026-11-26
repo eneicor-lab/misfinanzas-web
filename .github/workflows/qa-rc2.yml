@@ -139,24 +139,41 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: synthetic_ci_only
       PGDATABASE: misfinanzas_qa
+      MF_PREFLIGHT_ONLY: ${{ contains(github.event.head_commit.message, '[preflight-only]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: |
-          mkdir -p evidence
-          psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
-          psql -v ON_ERROR_STOP=1 -f sql/001_ledger_isolated.sql
-          psql -v ON_ERROR_STOP=1 -f sql/004_module_state.sql
-          psql -v ON_ERROR_STOP=1 -f tests/database/ledger.sql 2>&1 | tee evidence/database.log
-          psql -v ON_ERROR_STOP=1 -f tests/database/module_state.sql 2>&1 | tee -a evidence/database.log
-          python3 tests/database/concurrency.py 2>&1 | tee -a evidence/database.log
-          psql -v ON_ERROR_STOP=1 -f sql/006_book_state.sql
-          psql -v ON_ERROR_STOP=1 -f sql/006b_book_replay.sql
-          node tests/make-book-fixture.cjs
-          psql -v ON_ERROR_STOP=1 -v book_fixture="$(cat evidence/book-book.json)" -v next_fixture="$(cat evidence/book-next.json)" -v fresh_fixture="$(cat evidence/book-fresh.json)" -f tests/database/book_state.sql 2>&1 | tee -a evidence/database.log
+      - name: Run isolated database scope
+        run: |
+          if [[ "$MF_PREFLIGHT_ONLY" == 'true' ]]; then
+            mkdir -p evidence
+            psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
+            psql -v ON_ERROR_STOP=1 -f sql/001_ledger_isolated.sql
+            psql -v ON_ERROR_STOP=1 -f sql/004_module_state.sql
+            psql -v ON_ERROR_STOP=1 -f sql/006_book_state.sql
+            psql -v ON_ERROR_STOP=1 -f sql/006b_book_replay.sql
+            before=$(psql -qAtc "SELECT md5(coalesce(jsonb_agg(to_jsonb(t) ORDER BY id)::text,'')) FROM auth.users t")
+            PGOPTIONS='-c default_transaction_read_only=on' psql -v ON_ERROR_STOP=1 -f sql/PRECHECK_SUPABASE_READ_ONLY.sql 2>&1 | tee evidence/preflight.log
+            after=$(psql -qAtc "SELECT md5(coalesce(jsonb_agg(to_jsonb(t) ORDER BY id)::text,'')) FROM auth.users t")
+            test "$before" = "$after"
+            printf '%s\n' 'PASS complete preflight under enforced read-only transaction; synthetic Auth contents unchanged' >> evidence/preflight.log
+          else
+            mkdir -p evidence
+            psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
+            psql -v ON_ERROR_STOP=1 -f sql/001_ledger_isolated.sql
+            psql -v ON_ERROR_STOP=1 -f sql/004_module_state.sql
+            psql -v ON_ERROR_STOP=1 -f tests/database/ledger.sql 2>&1 | tee evidence/database.log
+            psql -v ON_ERROR_STOP=1 -f tests/database/module_state.sql 2>&1 | tee -a evidence/database.log
+            python3 tests/database/concurrency.py 2>&1 | tee -a evidence/database.log
+            psql -v ON_ERROR_STOP=1 -f sql/006_book_state.sql
+            psql -v ON_ERROR_STOP=1 -f sql/006b_book_replay.sql
+            node tests/make-book-fixture.cjs
+            psql -v ON_ERROR_STOP=1 -v book_fixture="$(cat evidence/book-book.json)" -v next_fixture="$(cat evidence/book-next.json)" -v fresh_fixture="$(cat evidence/book-fresh.json)" -f tests/database/book_state.sql 2>&1 | tee -a evidence/database.log
+          fi
       - name: Exercise real HTTP book persistence in isolated PostgREST
+        if: ${{ !contains(github.event.head_commit.message, '[preflight-only]') }}
         timeout-minutes: 3
         run: |
           mkdir -p /tmp/mf-postgrest
@@ -168,6 +185,7 @@ jobs:
           trap 'result=$?; kill "$postgrest_pid" 2>/dev/null || true; tail -n 30 evidence/postgrest.log; exit "$result"' EXIT
           node tests/database/book-http.cjs 2>&1 | tee evidence/book-http.log
       - name: Restore synthetic database into an isolated database
+        if: ${{ !contains(github.event.head_commit.message, '[preflight-only]') }}
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/database/restore-fixtures.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/acl.sql > evidence/acl-before.csv
@@ -190,6 +208,7 @@ jobs:
         with:
           name: database-${{ github.sha }}
           path: |
+            evidence/preflight.log
             evidence/postgrest.log
             evidence/book-http.log
             evidence/database.log
