@@ -9,7 +9,7 @@ pg() { docker exec -i "$MF_QA_CONTAINER" psql -X -v ON_ERROR_STOP=1 -U postgres 
 node tests/make-book-fixture.cjs
 pg -d postgres -f /project/tests/database/bootstrap.sql
 pg -d postgres -f /project/tests/database/legacy-contract.sql
-for f in 001_ledger_isolated.sql 004_module_state.sql 006_book_state.sql 006b_book_replay.sql 011_legacy_migration_candidate.sql 012_legacy_migration_revert_candidate.sql; do
+for f in 001_ledger_isolated.sql 004_module_state.sql 006_book_state.sql 006b_book_replay.sql 011_legacy_migration_candidate.sql 012_legacy_migration_revert_candidate.sql 013_auth_backup_candidate.sql; do
  pg -d postgres -f "/project/sql/$f"
 done
 pg -d postgres -f /project/evidence/test-owner-binding.sql
@@ -104,6 +104,7 @@ SQL
 pg -tA -d mf_migrate -c "SELECT mf_next.export_legacy_snapshot('11111111-1111-4111-8111-111111111111');" > evidence/legacy-source.json
 node tools/legacy-migrate.cjs evidence/legacy-source.json evidence/legacy-plan.json
 pg -d mf_migrate -v migration_plan="$(cat evidence/legacy-plan.json)" -f /project/tests/database/migration-state.sql
+bash tests/database/run-auth-recovery-qa.sh
 sha256sum evidence/financial.dump.gpg evidence/source.inventory evidence/restored.inventory > evidence/SHA256SUMS.txt
 printf '%s\n' 'PASS: full financial schemas, data, constraints, indexes, owners, ACL, RLS, functions, triggers and sequence state match after encrypted round trip.' 'PASS: restricted role cannot write, execute financial RPC or advance audit sequence; restored RLS isolates owner.' 'LIMITATION: Auth fixture only supplies synthetic identities; Auth service/session/provider recovery is NOT certified.' 'LIMITATION: legacy source metadata did not include all nullabilities, type lengths or six trigger definitions; fixture limitations remain explicit.' > evidence/backup-result.txt
 cat evidence/backup-result.txt
