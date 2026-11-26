@@ -1,0 +1,49 @@
+name: Prepare reviewed local vault dependency
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths: ['.github/workflows/qa-vault-dependency.yml']
+permissions:
+  contents: write
+concurrency:
+  group: vault-dependency-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/integration/misfinanzas-2.7-rc2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Obtain pinned AES implementation and preserve integrity/license
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mf-vendor
+          cd /tmp/mf-vendor
+          npm pack --ignore-scripts @noble/ciphers@2.0.1 --json > pack.json
+          tar -xzf noble-ciphers-2.0.1.tgz
+          export MF_VENDOR_ROOT="$GITHUB_WORKSPACE"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';
+          const metadata=JSON.parse(fs.readFileSync('pack.json','utf8'))[0],pkg=JSON.parse(fs.readFileSync('package/package.json','utf8'));
+          if(pkg.name!=='@noble/ciphers'||pkg.version!=='2.0.1')throw Error('Pinned dependency identity mismatch');
+          const names=fs.readdirSync('package').filter(n=>n.endsWith('.js')||n==='LICENSE'||n==='package.json');
+          if(!names.includes('aes.js')||!names.includes('LICENSE'))throw Error('Incomplete cipher dependency');
+          const manifest={package:pkg.name,version:pkg.version,npm_integrity:metadata.integrity,archive_sha256:crypto.createHash('sha256').update(fs.readFileSync('noble-ciphers-2.0.1.tgz')).digest('hex'),files:[]};
+          for(const name of names){const data=fs.readFileSync(path.join('package',name));for(const base of ['web','android/app/src/main/assets']){const target=path.join(process.env.MF_VENDOR_ROOT,base,'vendor/noble-ciphers',name);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,data);}manifest.files.push({path:name,bytes:data.length,sha256:crypto.createHash('sha256').update(data).digest('hex')});}
+          for(const base of ['web','android/app/src/main/assets'])fs.writeFileSync(path.join(process.env.MF_VENDOR_ROOT,base,'vendor/noble-ciphers/INTEGRITY.json'),JSON.stringify(manifest,null,2)+'\n');
+          console.log('Pinned dependency copied with MIT license and SHA256 manifest; no application entrypoint changed.');
+          JS
+      - name: Commit recoverable dependency to integration branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add web/vendor/noble-ciphers android/app/src/main/assets/vendor/noble-ciphers
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='MisFinanzas QA' -c user.email='qa@misfinanzas.invalid' commit -m '[skip ci] Preserve pinned local vault AES-GCM dependency and integrity manifest'
+          git push origin HEAD:integration/misfinanzas-2.7-rc2
