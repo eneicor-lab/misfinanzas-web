@@ -25,7 +25,11 @@ jobs:
           CLIENT_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set -euo pipefail
-          curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' https://supabase.com/prod-ca-2021.crt -o /tmp/mf-supabase-root.crt
+          if [[ ! -s sql/certs/supabase-root.crt ]]; then
+            echo 'BLOCKED: verified public CA certificate from Supabase Database Settings is required; TLS verification remains enforced.'
+            exit 1
+          fi
+          cp sql/certs/supabase-root.crt /tmp/mf-supabase-root.crt
           openssl x509 -in /tmp/mf-supabase-root.crt -noout -checkend 86400
           docker cp /tmp/mf-supabase-root.crt "$CLIENT_CONTAINER:/tmp/mf-supabase-root.crt"
           python3 - <<'PY'
