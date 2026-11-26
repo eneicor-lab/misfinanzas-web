@@ -3,70 +3,47 @@ on:
   workflow_dispatch:
   push:
     branches: [integration/misfinanzas-2.7-rc2]
-    paths: ['.github/workflows/qa-backup-candidate.yml','sql/010_backup_candidate_read_only.sql']
+    paths:
+      - '.github/workflows/qa-backup-candidate.yml'
+      - 'sql/010_backup_candidate_read_only.sql'
+      - 'tests/database/backup-*'
+      - 'tests/database/run-backup-qa.sh'
+      - 'tests/database/legacy-contract.sql'
 permissions:
   contents: read
+concurrency:
+  group: candidate-backup-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17
         env:
           POSTGRES_PASSWORD: synthetic-qa-only
-        ports: ['5432:5432']
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
-    env:
-      PGPASSWORD: synthetic-qa-only
-      PGHOST: localhost
-      PGUSER: postgres
-      PGDATABASE: postgres
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare synthetic schema
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client-17
-          export PATH=/usr/lib/postgresql/17/bin:$PATH
-          psql -v ON_ERROR_STOP=1 <<'SQL'
-          CREATE ROLE anon NOLOGIN;
-          CREATE ROLE authenticated NOLOGIN;
-          CREATE ROLE mf_backup LOGIN PASSWORD 'synthetic-backup-only';
-          CREATE SCHEMA auth;
-          CREATE TABLE auth.users(id uuid PRIMARY KEY,email_confirmed_at timestamptz);
-          CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
-          CREATE SCHEMA mf_next;
-          CREATE TABLE mf_next.accounts(id integer PRIMARY KEY);
-          CREATE TABLE mf_next.movements(id integer PRIMARY KEY);
-          CREATE TABLE mf_next.module_state(id integer PRIMARY KEY);
-          CREATE TABLE mf_next.feature_flags(id integer PRIMARY KEY);
-          CREATE TABLE mf_next.app_owner(id integer PRIMARY KEY);
-          CREATE TABLE public.mf_backup_probe(id integer PRIMARY KEY);
-          GRANT SELECT ON public.mf_backup_probe TO mf_backup;
-          DO $$ DECLARE t text; BEGIN
-            FOREACH t IN ARRAY ARRAY['accounts','movements','module_state'] LOOP
-              EXECUTE format('ALTER TABLE mf_next.%I ENABLE ROW LEVEL SECURITY',t);
-              EXECUTE format('ALTER TABLE mf_next.%I FORCE ROW LEVEL SECURITY',t);
-            END LOOP;
-            FOREACH t IN ARRAY ARRAY['accounts','movements','module_state','feature_flags','app_owner'] LOOP
-              EXECUTE format('INSERT INTO mf_next.%I VALUES (1),(2)',t);
-            END LOOP;
-          END $$;
-          INSERT INTO public.mf_backup_probe VALUES (1);
-          SQL
-          psql -v ON_ERROR_STOP=1 -f sql/010_backup_candidate_read_only.sql
-      - name: Dump both schemas as restricted role and restore
-        run: |
-          export PATH=/usr/lib/postgresql/17/bin:$PATH
-          PGPASSWORD=synthetic-backup-only pg_dump -U mf_backup --schema=public --schema=mf_next --enable-row-security --format=custom --file=/tmp/qa.dump
-          createdb mf_restore
-          pg_restore --exit-on-error --no-owner --no-privileges -d mf_restore /tmp/qa.dump
-          psql -d mf_restore -v ON_ERROR_STOP=1 <<'SQL'
-          DO $$ DECLARE t text; n bigint; BEGIN
-            FOREACH t IN ARRAY ARRAY['accounts','movements','module_state','feature_flags','app_owner'] LOOP
-              EXECUTE format('SELECT count(*) FROM mf_next.%I',t) INTO n;
-              IF n<>2 THEN RAISE EXCEPTION 'Incomplete restore: %',t; END IF;
-            END LOOP;
-            IF (SELECT count(*) FROM public.mf_backup_probe)<>1 THEN RAISE EXCEPTION 'Missing legacy data'; END IF;
-          END $$;
-          SQL
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Full-schema restricted backup and isolated restore
+        env:
+          MF_QA_CONTAINER: ${{ job.services.postgres.id }}
+        run: bash tests/database/run-backup-qa.sh 2>&1 | tee backup-qa.log
+      - name: Preserve synthetic evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-backup-${{ github.sha }}
+          path: |
+            backup-qa.log
+            evidence/*.inventory
+            evidence/*.diff
+            evidence/*.txt
+            evidence/*.sha256
+            evidence/*.gpg
+            evidence/*.toc
+          retention-days: 30

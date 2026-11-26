@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   regression:
-    if: ${{ !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[repair-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[repair-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
           name: regression-${{ github.sha }}
           path: evidence/
   browser:
-    if: ${{ !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +63,7 @@ jobs:
             test-results/
             evidence/playwright.json
   android:
-    if: ${{ !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -123,7 +123,7 @@ jobs:
           name: android-rc2-${{ github.sha }}
           path: artifacts/
   database:
-    if: ${{ !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') && !contains(github.event.head_commit.message, '[client-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[package-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') && !contains(github.event.head_commit.message, '[client-only]') }}
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -173,7 +173,7 @@ jobs:
             psql -v ON_ERROR_STOP=1 -v book_fixture="$(cat evidence/book-book.json)" -v next_fixture="$(cat evidence/book-next.json)" -v fresh_fixture="$(cat evidence/book-fresh.json)" -f tests/database/book_state.sql 2>&1 | tee -a evidence/database.log
           fi
       - name: Exercise real HTTP book persistence in isolated PostgREST
-        if: ${{ !contains(github.event.head_commit.message, '[preflight-only]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[preflight-only]') }}
         timeout-minutes: 3
         run: |
           mkdir -p /tmp/mf-postgrest
@@ -185,7 +185,7 @@ jobs:
           trap 'result=$?; kill "$postgrest_pid" 2>/dev/null || true; tail -n 30 evidence/postgrest.log; exit "$result"' EXIT
           node tests/database/book-http.cjs 2>&1 | tee evidence/book-http.log
       - name: Restore synthetic database into an isolated database
-        if: ${{ !contains(github.event.head_commit.message, '[preflight-only]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[preflight-only]') }}
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/database/restore-fixtures.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/acl.sql > evidence/acl-before.csv
@@ -217,7 +217,7 @@ jobs:
             evidence/acl-after.csv
 
   source:
-    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
