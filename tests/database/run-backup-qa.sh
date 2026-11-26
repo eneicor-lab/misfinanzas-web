@@ -51,10 +51,27 @@ END $$;
 RESET ROLE;
 SELECT mf_next.validate_book(payload) FROM mf_next.module_state WHERE module='book';
 SQL
-# Historical public-only backup remains restorable alongside a separate candidate dump.
+# Historical public-only backup must RESTORE, not merely list archive entries.
 docker exec -e PGPASSWORD=synthetic-backup-only "$MF_QA_CONTAINER" pg_dump -h localhost -U mf_backup -d postgres --schema=public --enable-row-security --format=custom > evidence/historical-public.dump
 docker exec -i "$MF_QA_CONTAINER" pg_restore --list /dev/stdin < evidence/historical-public.dump > evidence/historical.toc
+docker exec "$MF_QA_CONTAINER" createdb -U postgres mf_historical
+pg -d mf_historical <<'SQL'
+CREATE SCHEMA auth;
+CREATE TABLE auth.users(id uuid PRIMARY KEY,email_confirmed_at timestamptz DEFAULT now());
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claim.sub',true),''),nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
+GRANT USAGE ON SCHEMA auth TO authenticated,anon;
+INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
+CREATE EXTENSION pgcrypto;
+SQL
+docker exec -i "$MF_QA_CONTAINER" pg_restore -U postgres --exit-on-error -d mf_historical < evidence/historical-public.dump
+pg -d mf_historical <<'SQL'
+DO $$ BEGIN
+ IF (SELECT count(*) FROM public.mf_accounts)<>2 OR (SELECT count(*) FROM public.mf_events)<>2 THEN RAISE EXCEPTION 'Historical restore incomplete'; END IF;
+ IF (SELECT count(*) FROM pg_constraint WHERE connamespace='public'::regnamespace)<>60 THEN RAISE EXCEPTION 'Historical constraints missing'; END IF;
+END $$;
+SQL
 sha256sum evidence/financial.dump.gpg evidence/source.inventory evidence/restored.inventory > evidence/SHA256SUMS.txt
 printf '%s\n' 'PASS: full financial schemas, data, constraints, indexes, owners, ACL, RLS, functions, triggers and sequence state match after encrypted round trip.' 'PASS: restricted role cannot write, execute financial RPC or advance audit sequence; restored RLS isolates owner.' 'LIMITATION: Auth fixture only supplies synthetic identities; Auth service/session/provider recovery is NOT certified.' 'LIMITATION: legacy source metadata did not include all nullabilities, type lengths or six trigger definitions; fixture limitations remain explicit.' > evidence/backup-result.txt
 cat evidence/backup-result.txt
 rm evidence/financial.dump evidence/recovered.dump evidence/historical-public.dump
+
