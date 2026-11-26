@@ -17,3 +17,14 @@ document.getElementById('vaultCopy').addEventListener('click',()=>{try{const blo
 document.addEventListener('visibilitychange',()=>{if(document.hidden)lock();});
 window.addEventListener('pagehide',()=>vault.lock());
 configure();window.MF_VAULT_READY=true;
+
+// Native bridge accepts main-frame messages only. A user must opt in while unlocked.
+if(window.MF_NATIVE){
+ const button=document.createElement('button');button.type='button';button.textContent='Recordatorios Android';toolbar.append(button);
+ let refreshing=false,generation=0;
+ async function refresh(){if(!vault.unlocked||!frame||refreshing)return;refreshing=true;const current=generation;try{const enabled=vault.storage.getItem('mf_native_reminders_enabled')==='true';const rows=enabled?await window.MF_NATIVE_REMINDERS.plan(JSON.parse(vault.storage.getItem('presupuesto_demo_obligaciones_v12')||'[]'),frame.contentWindow.MF_SCHEDULE_ENGINE):[];if(current===generation)window.MF_NATIVE.postMessage(JSON.stringify({type:'replace',rows}));}catch(error){status.textContent=error.message;}finally{refreshing=false;if(current!==generation)queueMicrotask(refresh);}}
+ const originalSet=vault.storage.setItem;
+ vault.storage.setItem=(key,value)=>{originalSet(key,value);if(['presupuesto_demo_obligaciones_v12','mf_native_reminders_enabled'].includes(key)){generation++;window.MF_NATIVE.postMessage(JSON.stringify({type:'replace',rows:[]}));void refresh();}};
+ button.addEventListener('click',async()=>{if(!vault.unlocked)return;const enabled=vault.storage.getItem('mf_native_reminders_enabled')==='true';vault.storage.setItem('mf_native_reminders_enabled',String(!enabled));if(!enabled)window.MF_NATIVE.postMessage(JSON.stringify({type:'enable'}));await refresh();button.textContent=enabled?'Activar recordatorios Android':'Desactivar recordatorios Android';status.textContent=enabled?'Recordatorios Android desactivados.':'Recordatorios privados programados hasta 179 dias; Android puede retrasarlos. Reabre la aplicacion para renovar el horizonte.';});
+ setInterval(refresh,10000);window.addEventListener('pointerdown',()=>{void refresh();},{passive:true});
+}

@@ -14,6 +14,9 @@ import android.view.WindowInsets;
 import android.os.Build;
 import android.widget.FrameLayout;
 import androidx.webkit.WebViewAssetLoader;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+import java.util.Collections;
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler;
 
 /** DEV-only offline UI; never point this activity at the production Supabase project. */
@@ -61,7 +64,22 @@ public final class MainActivity extends Activity {
                 return !"appassets.androidplatform.net".equals(request.getUrl().getHost());
             }
         });
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(webView,"MF_NATIVE",Collections.singleton("https://appassets.androidplatform.net"),(view,message,origin,isMainFrame,reply)->{
+                if(!isMainFrame||!"https".equals(origin.getScheme())||!"appassets.androidplatform.net".equals(origin.getHost()))return;
+                try {
+                    org.json.JSONObject data=new org.json.JSONObject(message.getData());
+                    if("enable".equals(data.optString("type"))) {
+                        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},17);
+                    } else if("replace".equals(data.optString("type")))ReminderReceiver.replace(this,data.getJSONArray("rows").toString());
+                } catch(Exception ignored){/* Reject untrusted or malformed bridge messages. */}
+            });
+        }
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+        if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0 && getIntent().getBooleanExtra("mf_qa_notification",false)) {
+            try { ReminderReceiver.replace(this,"[{\"id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"at\":"+(System.currentTimeMillis()+2000)+"}]"); }
+            catch(org.json.JSONException ignored){throw new IllegalStateException("Synthetic reminder QA rejected");}
+        }
     }
     /** Synthetic local-only probe requires an explicit debug intent; never runs in release. */
     private void probePrivateApp(int attempt) {
