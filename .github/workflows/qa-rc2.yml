@@ -156,6 +156,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f sql/006b_book_replay.sql
           node tests/make-book-fixture.cjs
           psql -v ON_ERROR_STOP=1 -v book_fixture="$(cat evidence/book-book.json)" -v next_fixture="$(cat evidence/book-next.json)" -v fresh_fixture="$(cat evidence/book-fresh.json)" -f tests/database/book_state.sql 2>&1 | tee -a evidence/database.log
+      - name: Exercise real HTTP book persistence in isolated PostgREST
+        run: |
+          docker run -d --name mf-postgrest-qa --network host -e PGRST_DB_URI=postgres://postgres:synthetic_ci_only@127.0.0.1:5432/misfinanzas_qa -e PGRST_DB_SCHEMAS=mf_next -e PGRST_DB_ANON_ROLE=anon -e PGRST_JWT_SECRET=synthetic_postgrest_ci_signing_key_never_production_2026 -e PGRST_SERVER_PORT=3001 -e PGRST_SERVER_HOST=127.0.0.1 postgrest/postgrest:v12.2.3
+          node tests/database/book-http.cjs 2>&1 | tee evidence/book-http.log
       - name: Restore synthetic database into an isolated database
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/database/restore-fixtures.sql
@@ -179,6 +183,7 @@ jobs:
         with:
           name: database-${{ github.sha }}
           path: |
+            evidence/book-http.log
             evidence/database.log
             evidence/restore.log
             evidence/acl-before.csv
