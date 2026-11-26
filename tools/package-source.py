@@ -1,11 +1,12 @@
 """Build a recoverable source package from the checked-out public candidate only."""
-import hashlib,json,pathlib,re,subprocess,zipfile
+import hashlib,json,pathlib,re,subprocess,zipfile,os
 root=pathlib.Path(__file__).resolve().parents[1]
 tracked=subprocess.check_output(['git','ls-files','-z'],cwd=root).decode().split('\0')
 prefixes=('web/','android/','sql/','tests/','tools/')
 fixed={'package.json','playwright.config.cjs','.github/workflows/qa-rc2.yml','.github/workflows/respaldo-misfinanzas.yml','docs/ALCANCE_MONOUSUARIO.md','docs/QA_CANDIDATA.csv','INICIAR_MISFINANZAS_DEV.ps1','INICIAR_MISFINANZAS_DEV.cmd','MISFINANZAS_CHECKPOINT_REINICIO.md'}
-files=sorted(p for p in tracked if p and (p.startswith(prefixes) or p in fixed))
-apk_commit='2a7e40e8cdae998abc8a15cee42ce7160684c08b'
+files=sorted(p for p in tracked if p and (p.startswith(prefixes) or p.startswith('.github/workflows/') or p in fixed))
+apk_commit=os.environ['MF_TESTED_APK_COMMIT']
+if not re.fullmatch(r'[a-f0-9]{40}',apk_commit):raise SystemExit('Verified APK commit required')
 subprocess.run(['git','diff','--exit-code',apk_commit,'HEAD','--','web','android'],cwd=root,check=True)
 commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
 patterns=[rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY',rb'\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}',rb'\bsb_secret_[A-Za-z0-9_-]{12,}']
