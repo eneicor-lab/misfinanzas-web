@@ -188,3 +188,21 @@ jobs:
             evidence/restore.log
             evidence/acl-before.csv
             evidence/acl-after.csv
+
+  source:
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tools/package-source.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ github.sha }}
+          path: |
+            artifacts/*-source.zip
+            artifacts/MANIFIESTO_SHA256.json
+            artifacts/SOURCE_COMMIT.txt
+            artifacts/SOURCE_SHA256SUMS.txt
