@@ -25,6 +25,8 @@ jobs:
           python-version: '3.12'
       - run: mkdir -p evidence && npm test 2>&1 | tee evidence/node.log
       - run: node tests/reminder-compatibility.test.cjs 2>&1 | tee evidence/reminder-compatibility.log
+      - run: node tests/private-vault.test.cjs 2>&1 | tee evidence/private-vault.log
+      - run: node tools/check-assets.cjs 2>&1 | tee evidence/asset-parity.log
       - run: python -m unittest discover -s tests -v 2>&1 | tee evidence/python.log
       - run: python tests/check_candidate.py 2>&1 | tee evidence/candidate.log
       - uses: actions/upload-artifact@v4
@@ -49,7 +51,7 @@ jobs:
           if [[ "$MF_QA_SCOPE" == 'recurrence' ]]; then
             npx playwright test tests/browser/recurrence.spec.cjs tests/browser/products.spec.cjs --grep 'custom recurrence|all preset|custom subscription|subscriptions and single'
           elif [[ "$MF_QA_SCOPE" == 'unified-ui' ]]; then
-            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs
+            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs tests/browser/private-vault.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'sync' ]]; then
             npx playwright test tests/browser/module-sync.spec.cjs tests/browser/book-sync.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
@@ -84,14 +86,14 @@ jobs:
       - run: gradle -p android :app:assembleDebug --no-daemon
       - name: Verify asset parity and APK integrity
         run: |
-          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js module-sync.js auth-recovery.js unified-ledger.js unified-ui.js book-sync.js book-session.js book-sync-ui.js; do cmp "web/$f" "android/app/src/main/assets/$f"; done
+          node tools/check-assets.cjs
           mkdir -p artifacts
           cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/MisFinanzas-2.7.0-rc2-debug.apk
           printf '%s\n' '${{ github.sha }}' > artifacts/COMMIT.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging artifacts/*.apk > artifacts/apk-badging.txt
           grep -F 'co.misfinanzas.dev' artifacts/apk-badging.txt
           grep -F 'MisFinanzas' artifacts/apk-badging.txt
-          for f in index.html supabase-dev.html finance-safety.js schedule-engine.js planning.js module-sync.js auth-recovery.js unified-ledger.js unified-ui.js book-sync.js book-session.js book-sync-ui.js; do unzip -p artifacts/*.apk "assets/$f" | cmp - "web/$f"; done
+          while IFS= read -r f; do unzip -p artifacts/*.apk "assets/${f#web/}" | cmp - "$f"; done < <(find web -type f | sort)
           sha256sum android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png > artifacts/icon-source-sha256.txt
           cd artifacts && sha256sum *.apk | tee SHA256SUMS.txt
       - name: Enable KVM for isolated Android emulator
@@ -108,7 +110,7 @@ jobs:
           disable-animations: true
           script: |
             adb install -r artifacts/MisFinanzas-2.7.0-rc2-debug.apk
-            adb shell am start -W -n co.misfinanzas.dev/.MainActivity
+            adb shell am start -W -n co.misfinanzas.dev/.MainActivity --ez mf_qa_unlock true
             sleep 5
             adb shell pidof co.misfinanzas.dev > artifacts/android-pid.txt
             adb exec-out screencap -p > artifacts/android-screen.png
