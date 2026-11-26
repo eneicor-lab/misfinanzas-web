@@ -1,0 +1,8 @@
+const{test,expect}=require('@playwright/test');
+test('private shell lock revokes remote session and destroys decrypted frames',async({page})=>{
+ let revoked=0;await page.route('https://qa-misfinanzas.supabase.co/**',async route=>{const u=route.request().url();if(u.includes('/logout'))revoked++;const body=u.includes('/token')?{access_token:'synthetic-only-session',user:{id:'11111111-1111-4111-8111-111111111111',email_confirmed_at:'2026-01-01T00:00:00Z'}}:u.includes('/user')?{id:'11111111-1111-4111-8111-111111111111'}:[];await route.fulfill({json:body});});
+ await page.goto('/');await page.locator('#vaultPassword').fill('Synthetic+Vault!123');await page.locator('#vaultConfirmation').fill('Synthetic+Vault!123');await page.locator('#vaultOpen').click();await expect.poll(()=>page.evaluate(()=>window.MF_APP_READY)).toBe(true);
+ const app=page.frameLocator('#mfPrivateApp');await app.locator('body').evaluate(()=>navTo('movimientos'));await app.locator('#mfdev-confirm').check();await app.locator('#mfdev-open').click();
+ const auth=app.frameLocator('#mfdev-frame');await auth.locator('#url').fill('https://qa-misfinanzas.supabase.co');await auth.locator('#key').fill('sb_publishable_synthetic_qa');await auth.locator('#email').fill('synthetic@example.invalid');await auth.locator('#password').fill('SyntheticOnly!12345');await auth.locator('#login').click();await expect(auth.locator('#shell')).toBeVisible();
+ await page.locator('#vaultLock').click();await expect(page.locator('#mfPrivateApp')).toHaveCount(0);await expect.poll(()=>revoked).toBe(1);expect(await page.evaluate(()=>JSON.stringify({...localStorage}))).not.toContain('synthetic-only-session');
+});

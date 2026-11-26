@@ -5,6 +5,7 @@ window.MF_VAULT=vault;
 function configure(){const create=!vault.exists;document.getElementById('confirmationLabel').hidden=!create;confirmation.required=create;document.getElementById('vaultOpen').textContent=create?'Proteger y abrir':'Abrir MisFinanzas';document.getElementById('vaultCopy').disabled=create;password.autocomplete=create?'new-password':'current-password';}
 function resetIdle(){clearTimeout(idle);idle=setTimeout(()=>lock('La aplicación se bloqueó por inactividad.'),5*60*1000);}
 function lock(message='Aplicación bloqueada. Tus datos locales permanecen cifrados.'){
+ try{const bridge=frame?.contentWindow?.document.getElementById('mfdev-frame')?.contentWindow?.MF_BOOK_SESSION;if(bridge?.logout)void bridge.logout({lockPrivate:false});}catch{}
  clearTimeout(idle);vault.lock();window.MF_APP_READY=false;if(frame){frame.remove();frame=null;}panel.hidden=false;toolbar.hidden=true;status.textContent=message;password.value=confirmation.value='';configure();
 }
 window.MF_PRIVATE_LOCK=()=>lock();
