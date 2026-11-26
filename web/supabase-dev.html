@@ -98,7 +98,7 @@ document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>nav(b.dataset.n
 /* Same-origin typed bridge: credentials remain in the authenticated frame. */
 (function(root){'use strict';
  function session(){if(!token||!sessionOwner)throw Error('Inicia sesión con correo verificado en la consulta Supabase');return {owner:base+':'+sessionOwner,epoch:sessionEpoch}}
- const allowed=new Set(['book','planning','catalogs','reminders']);
+ const allowed=new Set(['book','planning','catalogs','reminders','preferences','notifications']);
  const headers={'Accept-Profile':'mf_next','Content-Profile':'mf_next'};
  async function authorizeVault(){const c=session(),vault=root.parent?.MF_VAULT_CONTEXT;if(vault?.bindOwner)await vault.bindOwner(c.owner);if(session().epoch!==c.epoch)throw Error('La sesión cambió');return c}
  async function contract(){await authorizeVault();return req('/rest/v1/rpc/book_sync_contract','GET',undefined,headers)}
