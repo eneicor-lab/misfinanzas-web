@@ -141,6 +141,9 @@ jobs:
       PGDATABASE: misfinanzas_qa
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - run: |
           mkdir -p evidence
           psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
@@ -149,6 +152,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/database/ledger.sql 2>&1 | tee evidence/database.log
           psql -v ON_ERROR_STOP=1 -f tests/database/module_state.sql 2>&1 | tee -a evidence/database.log
           python3 tests/database/concurrency.py 2>&1 | tee -a evidence/database.log
+          psql -v ON_ERROR_STOP=1 -f sql/006_book_state.sql
+          psql -v ON_ERROR_STOP=1 -f sql/006b_book_replay.sql
+          node tests/make-book-fixture.cjs
+          psql -v ON_ERROR_STOP=1 -v book_fixture="$(cat evidence/book-book.json)" -v next_fixture="$(cat evidence/book-next.json)" -v fresh_fixture="$(cat evidence/book-fresh.json)" -f tests/database/book_state.sql 2>&1 | tee -a evidence/database.log
       - name: Restore synthetic database into an isolated database
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/database/restore-fixtures.sql

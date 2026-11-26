@@ -3,7 +3,8 @@
  const KEY='misfinanzas_unified_ledger_v1',LEGACY='misfinanzas_motor_integrado_v028',MAX=999999999999;
  const clone=x=>JSON.parse(JSON.stringify(x)),fail=m=>{throw Error(m)},money=n=>Number.isSafeInteger(n)&&n>=0&&n<=MAX;
  function createEngine(B,E,S){
-  function projection(bank){return Object.values(bank.accounts).map(a=>({id:a.id,name:a.name||a.id,balance:B.balance(bank,a.id)}))}
+  const byId=(a,b)=>a.id<b.id?-1:a.id>b.id?1:0;
+  function projection(bank){return Object.values(bank.accounts).map(a=>({id:a.id,name:a.name||a.id,balance:B.balance(bank,a.id)})).sort(byId)}
   function align(s){s.debt.accounts=projection(s.bank);return s}
   function fresh(bank=B.createState([])){return check(align({version:1,bank:clone(bank),debt:E.fresh()}))}
   function check(s){
@@ -16,7 +17,7 @@
     if(e.type!=='expense'){if(!(e.to in balances)||e.type==='transfer'&&e.to===e.from)fail('Destino inválido');balances[e.to]+=e.amount;if(!money(balances[e.to]))fail('Saldo fuera de rango')}
    }
    if(bank.keys.length!==keys.size||new Set(bank.keys).size!==keys.size||bank.keys.some(k=>!keys.has(k)))fail('Claves del libro inconsistentes');
-   E.assertState(s.debt);if(S.stable(s.debt.accounts)!==S.stable(projection(bank)))fail('Los saldos de deuda y cuentas no coinciden');
+   E.assertState(s.debt);if(S.stable(s.debt.accounts.slice().sort(byId))!==S.stable(projection(bank)))fail('Los saldos de deuda y cuentas no coinciden');
    const payments=s.debt.entries.filter(p=>p.kind==='loan_payment'||p.kind==='card_payment');
    for(const l of s.debt.loans){if(!money(l.openingPrincipal)||l.openingPrincipal>l.original)fail('Base inicial de préstamo inválida');const capital=S.sum(payments.filter(p=>p.kind==='loan_payment'&&p.loanId===l.id).map(p=>p.capital));if(l.principal!==l.openingPrincipal-capital)fail('Capital del préstamo no concilia con sus pagos')}
    for(const p of payments){const matches=bank.events.filter(e=>e.financialClass==='debt_payment'&&e.debtEntryId===p.id);if(matches.length!==1||matches[0].from!==p.accountId||matches[0].amount!==p.amount||matches[0].date!==p.date)fail('Pago sin débito único en cuenta')}
