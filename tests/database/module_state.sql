@@ -3,7 +3,7 @@ SELECT set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111'
 DO $$ DECLARE version integer; rejected boolean; body jsonb; BEGIN
  version:=mf_next.put_module_state('planning',0,'{"version":1,"budgets":[],"goals":[],"reservations":[]}'::jsonb);
  IF version<>1 THEN RAISE EXCEPTION 'Initial revision failed'; END IF;
- rejected:=false;BEGIN PERFORM mf_next.put_module_state('planning',0,'{}');EXCEPTION WHEN serialization_failure THEN rejected:=true;END;IF NOT rejected THEN RAISE EXCEPTION 'Concurrent state overwrite allowed'; END IF;
+ rejected:=false;BEGIN PERFORM mf_next.put_module_state('planning',0,'{}');EXCEPTION WHEN SQLSTATE 'PT409' THEN rejected:=true;END;IF NOT rejected THEN RAISE EXCEPTION 'Concurrent state overwrite allowed'; END IF;
  version:=mf_next.put_module_state('planning',1,'{"version":1,"budgets":[],"goals":[],"reservations":[],"synthetic":true}'::jsonb);
  IF version<>2 THEN RAISE EXCEPTION 'Revision increment failed'; END IF;
  SELECT payload INTO body FROM mf_next.get_module_state('planning');IF body->>'synthetic'<>'true' THEN RAISE EXCEPTION 'Readback mismatch'; END IF;

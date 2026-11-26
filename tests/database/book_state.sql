@@ -24,7 +24,7 @@ SET ROLE authenticated;
 DO $$ DECLARE b jsonb:=current_setting('mf.synthetic_book')::jsonb;bad jsonb;rejected boolean;r int;BEGIN
  IF (mf_next.book_sync_contract()->>'protected')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'Unsafe book contract';END IF;
  r:=mf_next.put_module_state('book',0,b);IF r<>1 THEN RAISE EXCEPTION 'Initial book revision failed';END IF;
- rejected:=false;BEGIN PERFORM mf_next.put_module_state('book',0,b);EXCEPTION WHEN serialization_failure THEN rejected:=true;END;IF NOT rejected THEN RAISE EXCEPTION 'Book CAS failed';END IF;
+ rejected:=false;BEGIN PERFORM mf_next.put_module_state('book',0,b);EXCEPTION WHEN SQLSTATE 'PT409' THEN rejected:=true;END;IF NOT rejected THEN RAISE EXCEPTION 'Book CAS failed';END IF;
  FOREACH bad IN ARRAY ARRAY[
   jsonb_set(b,'{bank,accounts,z,opening}','0.5'),
   jsonb_set(b,'{bank,events,0,type}','null'),

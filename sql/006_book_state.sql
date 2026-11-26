@@ -1,3 +1,4 @@
+-- Application revision conflicts use PT409; never signal a retryable database serialization failure.
 -- Additive extension of the isolated candidate schema. Never applied to production by this mission.
 BEGIN;
 CREATE TABLE IF NOT EXISTS mf_next.feature_flags(feature text PRIMARY KEY,enabled boolean NOT NULL DEFAULT false);
@@ -117,7 +118,7 @@ BEGIN
  IF p_module='book' AND (NOT EXISTS(SELECT 1 FROM mf_next.app_owner WHERE owner_id=v_owner) OR NOT EXISTS(SELECT 1 FROM auth.users WHERE id=v_owner AND email_confirmed_at IS NOT NULL)) THEN RAISE EXCEPTION 'A verified application owner is required' USING ERRCODE='42501';END IF;
  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_owner::text||':'||p_module,0));
  SELECT revision,payload INTO v_revision,v_old FROM mf_next.module_state WHERE owner_id=v_owner AND module=p_module;
- IF coalesce(v_revision,0)<>p_expected_revision THEN RAISE EXCEPTION 'Module revision conflict' USING ERRCODE='40001';END IF;
+ IF coalesce(v_revision,0)<>p_expected_revision THEN RAISE EXCEPTION 'Module revision conflict' USING ERRCODE='PT409';END IF;
  IF p_module='book' THEN
   PERFORM mf_next.validate_book(p_payload);
   IF v_old IS NOT NULL THEN
