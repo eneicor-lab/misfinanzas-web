@@ -86,4 +86,3 @@ sha256sum evidence/financial.dump.gpg evidence/source.inventory evidence/restore
 printf '%s\n' 'PASS: full financial schemas, data, constraints, indexes, owners, ACL, RLS, functions, triggers and sequence state match after encrypted round trip.' 'PASS: restricted role cannot write, execute financial RPC or advance audit sequence; restored RLS isolates owner.' 'LIMITATION: Auth fixture only supplies synthetic identities; Auth service/session/provider recovery is NOT certified.' 'LIMITATION: legacy source metadata did not include all nullabilities, type lengths or six trigger definitions; fixture limitations remain explicit.' > evidence/backup-result.txt
 cat evidence/backup-result.txt
 rm evidence/financial.dump evidence/recovered.dump evidence/historical-public.dump
-
