@@ -7,7 +7,9 @@ def request(base,path,body=None,token=None,method=None):
     if token:headers['Authorization']='Bearer '+token
     req=urllib.request.Request(base+path,None if body is None else json.dumps(body).encode(),headers,method=method)
     try:
-        with urllib.request.urlopen(req,timeout=15) as r:return r.status,json.load(r)
+        with urllib.request.urlopen(req,timeout=15) as r:
+            raw=r.read()
+            return r.status,json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
         try:data=json.load(e)
         except Exception:data={}
