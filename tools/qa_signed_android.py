@@ -1,5 +1,5 @@
 """External UI automation of the signed release; no debug bridge or security bypass."""
-import os,re,subprocess,time,xml.etree.ElementTree as ET
+import os,re,subprocess,time,json,xml.etree.ElementTree as ET
 from pathlib import Path
 out=Path('artifacts');out.mkdir(exist_ok=True)
 package='co.misfinanzas.dev'
@@ -17,7 +17,9 @@ def wait_for(predicate,timeout=45):
             last=tree
         except (ET.ParseError,ValueError,subprocess.CalledProcessError):pass
         time.sleep(1)
-    if last is not None:ET.ElementTree(last).write(out/'release-failure.xml',encoding='utf-8')
+    if last is not None:
+        ET.ElementTree(last).write(out/'release-failure.xml',encoding='utf-8')
+        print('Synthetic UI state: '+json.dumps([{'class':n.get('class'),'text':n.get('text'),'bounds':n.get('bounds')} for n in last.iter('node') if n.get('text') and n.get('password')!='true'][:20]))
     raise RuntimeError('Signed release UI did not reach the expected state; security controls remain enabled')
 def nodes(tree,fn):return [n for n in tree.iter('node') if fn(n)]
 def text(tree,value):return nodes(tree,lambda n:n.get('text')==value or n.get('content-desc')==value)
@@ -35,7 +37,7 @@ def unlock(create=False):
 apk=next(out.glob('*signed.apk'))
 adb('install','-r',str(apk));adb('shell','am','start','-W','-n',package+'/.MainActivity')
 unlock(create=True)
-tap(wait_for(lambda t:text(t,'Bloquear'))[0]);wait_for(lambda t:text(t,'Clave local'))
+tap(wait_for(lambda t:text(t,'Bloquear'))[0]);wait_for(lambda t:text(t,'Abrir MisFinanzas') and len(nodes(t,lambda n:n.get('class')=='android.widget.EditText'))==1)
 print('PASS release lock removes private application and requires passphrase')
 adb('install','-r',str(apk));adb('shell','am','start','-W','-n',package+'/.MainActivity')
 wait_for(lambda t:text(t,'Abrir MisFinanzas'));unlock()
