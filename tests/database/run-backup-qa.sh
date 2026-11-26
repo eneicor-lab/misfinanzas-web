@@ -9,7 +9,7 @@ pg() { docker exec -i "$MF_QA_CONTAINER" psql -X -v ON_ERROR_STOP=1 -U postgres 
 node tests/make-book-fixture.cjs
 pg -d postgres -f /project/tests/database/bootstrap.sql
 pg -d postgres -f /project/tests/database/legacy-contract.sql
-for f in 001_ledger_isolated.sql 004_module_state.sql 006_book_state.sql 006b_book_replay.sql; do
+for f in 001_ledger_isolated.sql 004_module_state.sql 006_book_state.sql 006b_book_replay.sql 011_legacy_migration_candidate.sql 012_legacy_migration_revert_candidate.sql; do
  pg -d postgres -f "/project/sql/$f"
 done
 pg -d postgres -f /project/evidence/test-owner-binding.sql
@@ -82,6 +82,28 @@ DO $$ BEGIN
  IF (SELECT count(*) FROM pg_constraint WHERE connamespace='public'::regnamespace)<>60 THEN RAISE EXCEPTION 'Historical constraints missing'; END IF;
 END $$;
 SQL
+# Separate recovered database for actual legacy export -> JS planner -> transactional import.
+docker exec "$MF_QA_CONTAINER" createdb -U postgres mf_migrate
+pg -d mf_migrate <<'SQL'
+CREATE SCHEMA auth;
+CREATE TABLE auth.users(id uuid PRIMARY KEY,email_confirmed_at timestamptz DEFAULT now());
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claim.sub',true),''),nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
+GRANT USAGE ON SCHEMA auth TO authenticated,anon;
+INSERT INTO auth.users(id) VALUES ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
+DROP SCHEMA public;
+CREATE SCHEMA extensions;
+CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
+SQL
+docker exec -i "$MF_QA_CONTAINER" pg_restore -U postgres --exit-on-error -d mf_migrate < evidence/recovered.dump
+pg -d mf_migrate < evidence/schema-acl.sql
+pg -d mf_migrate <<'SQL'
+-- Only synthetic restored QA rows; hosted production is never a target.
+DELETE FROM auth.users WHERE id='22222222-2222-4222-8222-222222222222';
+DELETE FROM mf_next.module_state;
+SQL
+pg -tA -d mf_migrate -c "SELECT mf_next.export_legacy_snapshot('11111111-1111-4111-8111-111111111111');" > evidence/legacy-source.json
+node tools/legacy-migrate.cjs evidence/legacy-source.json evidence/legacy-plan.json
+pg -d mf_migrate -v migration_plan="$(cat evidence/legacy-plan.json)" -f /project/tests/database/migration-state.sql
 sha256sum evidence/financial.dump.gpg evidence/source.inventory evidence/restored.inventory > evidence/SHA256SUMS.txt
 printf '%s\n' 'PASS: full financial schemas, data, constraints, indexes, owners, ACL, RLS, functions, triggers and sequence state match after encrypted round trip.' 'PASS: restricted role cannot write, execute financial RPC or advance audit sequence; restored RLS isolates owner.' 'LIMITATION: Auth fixture only supplies synthetic identities; Auth service/session/provider recovery is NOT certified.' 'LIMITATION: legacy source metadata did not include all nullabilities, type lengths or six trigger definitions; fixture limitations remain explicit.' > evidence/backup-result.txt
 cat evidence/backup-result.txt
