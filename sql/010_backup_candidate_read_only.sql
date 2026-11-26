@@ -39,8 +39,13 @@ BEGIN
   EXECUTE format('GRANT SELECT ON SEQUENCE %I.%I TO mf_backup',s.nspname,s.relname);
   IF has_sequence_privilege('mf_backup',s.oid,'USAGE,UPDATE') THEN RAISE EXCEPTION 'Backup can advance sequences'; END IF;
  END LOOP;
+ -- The sole optional exception is the reviewed, read-only Auth export (013).
+ IF to_regprocedure('mf_next.backup_auth_snapshot()') IS NOT NULL AND
+  (has_function_privilege('anon','mf_next.backup_auth_snapshot()','EXECUTE') OR has_function_privilege('authenticated','mf_next.backup_auth_snapshot()','EXECUTE')) THEN
+  RAISE EXCEPTION 'Auth backup export accessible to application roles';
+ END IF;
  FOR f IN SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-  WHERE n.nspname IN ('public','mf_next') AND p.prosecdef LOOP
+  WHERE n.nspname IN ('public','mf_next') AND p.prosecdef AND p.oid IS DISTINCT FROM to_regprocedure('mf_next.backup_auth_snapshot()') LOOP
   IF has_function_privilege('mf_backup',f.oid,'EXECUTE') THEN
    RAISE EXCEPTION 'Backup can execute a security definer function: %',f.oid::regprocedure;
   END IF;
