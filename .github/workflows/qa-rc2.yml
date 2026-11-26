@@ -230,16 +230,19 @@ jobs:
 
   source:
     needs: [regression, browser, android, database]
-    if: ${{ !contains(github.event.head_commit.message, '[recurrence-only]') && !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ always() && !cancelled() && (contains(github.event.head_commit.message, '[package-only]') || (needs.regression.result == 'success' && needs.browser.result == 'success' && needs.android.result == 'success' && needs.database.result == 'success')) && !contains(github.event.head_commit.message, '[recurrence-only]') && !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Fetch previously approved application only for a packaging-only update
+        if: contains(github.event.head_commit.message, '[package-only]')
+        run: git fetch --depth=1 origin 5596f71344e5445ed2829403d9401dbdffbb8a05
       - run: python tools/package-source.py
         env:
-          MF_TESTED_APK_COMMIT: ${{ github.sha }}
+          MF_TESTED_APK_COMMIT: ${{ contains(github.event.head_commit.message, '[package-only]') && '5596f71344e5445ed2829403d9401dbdffbb8a05' || github.sha }}
       - uses: actions/upload-artifact@v4
         with:
           name: source-${{ github.sha }}
