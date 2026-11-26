@@ -11,6 +11,7 @@
    const bank=s.bank,balances=Object.create(null);for(const [id,a]of Object.entries(bank.accounts)){if(!id||id!==a.id||a.kind!=='asset'||!money(a.opening))fail('Cuenta heredada requiere conciliación antes de integrarla');balances[id]=a.opening}
    for(const a of bank.openingAdjustments||[]){if(!(a.accountId in balances)||!Number.isSafeInteger(a.delta))fail('Ajuste inicial inválido');balances[a.accountId]+=a.delta;if(!money(balances[a.accountId]))fail('Ajuste fuera de rango')}
    const ids=new Set(),keys=new Set();for(const e of bank.events){if(!e||!e.id||!e.key||ids.has(e.id)||keys.has(e.key)||!money(e.amount)||e.amount===0||!S.dateOK(e.date)||e.date>S.today()||!['income','expense','transfer'].includes(e.type))fail('Historial de movimientos inválido');ids.add(e.id);keys.add(e.key);
+    if(e.allocations!==undefined){if(!Array.isArray(e.allocations)||!e.allocations.length||e.type==='transfer'||e.allocations.some(a=>!a||typeof a.category!=='string'||!a.category.trim()||a.category.length>100||!money(a.amount)||a.amount===0)||S.sum(e.allocations.map(a=>a.amount))!==e.amount)fail('La discriminación no coincide con el importe del movimiento')}
     if(e.type!=='income'){if(!(e.from in balances)||balances[e.from]<e.amount)fail('Historial con saldo insuficiente');balances[e.from]-=e.amount}
     if(e.type!=='expense'){if(!(e.to in balances)||e.type==='transfer'&&e.to===e.from)fail('Destino inválido');balances[e.to]+=e.amount;if(!money(balances[e.to]))fail('Saldo fuera de rango')}
    }

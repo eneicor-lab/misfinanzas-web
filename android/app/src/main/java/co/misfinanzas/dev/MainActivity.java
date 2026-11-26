@@ -35,7 +35,7 @@ public final class MainActivity extends Activity {
                 boolean debug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
                 if (debug && "https://appassets.androidplatform.net/assets/index.html".equals(url)) {
                     view.evaluateJavascript(
-                        "Boolean(window.isSecureContext && navigator.locks && window.MF_APP_STORE && document.getElementById('mfUnifiedOverview'))",
+                        "(function(){try{return Boolean(window.isSecureContext && navigator.locks && window.MF_APP_STORE && MF_APP_ENGINE.check(MF_APP_STORE.read().state) && document.getElementById('mfUnifiedOverview'))}catch(e){return false}})()",
                         result -> Log.i("MisFinanzasQA", "web_ready=" + result));
                 }
             }

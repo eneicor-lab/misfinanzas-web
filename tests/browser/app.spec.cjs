@@ -18,7 +18,7 @@ test('accounts, cash, duplicate protection, persistent reload',async({page})=>{
  await page.reload();expect(await page.evaluate(k=>Object.values(MF_APP_STORE.read().state.bank.accounts).filter(a=>/QA$/.test(a.name)).length,KEY)).toBe(2);
 });
 test('income, expense, transfer and insufficient balance through forms',async({page})=>{
- await page.goto('/');await nav(page,'configuracion');for(const name of ['QA origen','QA destino']){await page.locator('#mf28Account').fill(name);await page.locator('#mf28Opening').fill('10000');await page.locator('#mf28AddAccount').click();}
+ await page.goto('/');await nav(page,'configuracion');for(const name of ['QA origen','QA destino']){await page.locator('#mf28Account').fill(name);await page.locator('#mf28Opening').fill('10000');await page.locator('#mf28AddAccount').click();await expect(page.locator('#mf53AccountStatus')).toContainText('Cuenta creada');}
  const ids=await page.evaluate(k=>Object.values(MF_APP_STORE.read().state.bank.accounts).filter(a=>a.name.startsWith('QA ')).map(a=>a.id),KEY);
  await nav(page,'movimientos');
  for(const [type,amount,third] of [['income','1000','Pagador QA'],['expense','500','Comercio QA'],['transfer','300','']]){
