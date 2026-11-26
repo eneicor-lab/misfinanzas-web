@@ -46,7 +46,7 @@ jobs:
           MF_QA_SCOPE: ${{ (contains(github.event.head_commit.message, '[ui-only]') || contains(github.event.head_commit.message, '[client-only]')) && 'unified-ui' || contains(github.event.head_commit.message, '[sync-only]') && 'sync' || contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
         run: |
           if [[ "$MF_QA_SCOPE" == 'unified-ui' ]]; then
-            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs
+            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'sync' ]]; then
             npx playwright test tests/browser/module-sync.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
