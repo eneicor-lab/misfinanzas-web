@@ -43,7 +43,10 @@ CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 SQL
 docker exec -i "$MF_QA_CONTAINER" pg_restore -U postgres --exit-on-error -d mf_restore < evidence/recovered.dump
 pg -q -d mf_restore -f /project/tests/database/backup-inventory.sql > evidence/restored.inventory
-diff -u evidence/source.inventory evidence/restored.inventory > evidence/restore.diff
+if ! diff -u evidence/source.inventory evidence/restored.inventory > evidence/restore.diff; then
+ cat evidence/restore.diff
+ exit 1
+fi
 pg -d mf_restore -f /project/tests/database/backup-permissions.sql
 pg -d mf_restore <<'SQL'
 SET ROLE authenticated;
