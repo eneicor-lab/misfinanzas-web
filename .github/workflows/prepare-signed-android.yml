@@ -102,7 +102,21 @@ jobs:
           while IFS= read -r f; do unzip -p artifacts/*.apk "assets/${f#web/}" | cmp - "$f"; done < <(find web -type f | sort)
           printf '%s\n' '${{ github.sha }}' > artifacts/COMMIT.txt
           (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
+          cat artifacts/SHA256SUMS.txt
           printf '%s\n' 'Stable signing identity recovered from encrypted owner-only Drive storage; original bank icon retained.' 'Candidate only: this artifact does not certify production, migration approval or remote financial writes.' 'Installing over historical debug APKs requires their matching signer; never uninstall or discard existing data automatically.' > artifacts/STATUS.txt
+      - name: Enable KVM for release installation QA
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: python tools/qa_signed_android.py
       - name: Preserve APK and public certificate evidence only
         if: always()
         uses: actions/upload-artifact@v4
