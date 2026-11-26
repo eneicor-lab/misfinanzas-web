@@ -112,6 +112,7 @@ jobs:
             for attempt in $(seq 1 15); do if adb logcat -d -s MisFinanzasQA:I | grep -q 'web_ready=true'; then break; fi; sleep 2; done
             adb logcat -d -s MisFinanzasQA:I AndroidRuntime:E > artifacts/android-runtime.log
             grep -q 'web_ready=true' artifacts/android-runtime.log
+            grep -F 'web_ready=' artifacts/android-runtime.log
             test -s artifacts/android-pid.txt
             if grep -q 'FATAL EXCEPTION' artifacts/android-runtime.log; then exit 1; fi
             adb shell uiautomator dump /sdcard/window.xml || true
