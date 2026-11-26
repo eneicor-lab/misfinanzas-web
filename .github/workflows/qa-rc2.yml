@@ -24,6 +24,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: mkdir -p evidence && npm test 2>&1 | tee evidence/node.log
+      - run: node tests/reminder-compatibility.test.cjs 2>&1 | tee evidence/reminder-compatibility.log
+      - run: node tests/reminder-compatibility.test.cjs 2>&1 | tee evidence/reminder-compatibility.log
       - run: python -m unittest discover -s tests -v 2>&1 | tee evidence/python.log
       - run: python tests/check_candidate.py 2>&1 | tee evidence/candidate.log
       - uses: actions/upload-artifact@v4
@@ -46,7 +48,7 @@ jobs:
           MF_QA_SCOPE: ${{ (contains(github.event.head_commit.message, '[ui-only]') || contains(github.event.head_commit.message, '[client-only]')) && 'unified-ui' || (contains(github.event.head_commit.message, '[sync-only]') || contains(github.event.head_commit.message, '[repair-only]')) && 'sync' || contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
         run: |
           if [[ "$MF_QA_SCOPE" == 'unified-ui' ]]; then
-            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs
+            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs tests/browser/book-sync.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs tests/browser/module-sync.spec.cjs tests/browser/recurrence.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'sync' ]]; then
             npx playwright test tests/browser/module-sync.spec.cjs tests/browser/book-sync.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
@@ -217,7 +219,7 @@ jobs:
             evidence/acl-after.csv
 
   source:
-    if: ${{ !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[client-only]') && !contains(github.event.head_commit.message, '[backup-only]') && !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -236,3 +238,4 @@ jobs:
             artifacts/SOURCE_COMMIT.txt
             artifacts/APK_APP_PARITY.txt
             artifacts/SOURCE_SHA256SUMS.txt
+
