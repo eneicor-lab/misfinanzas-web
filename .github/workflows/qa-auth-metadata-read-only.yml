@@ -1,0 +1,52 @@
+name: Read-only PostgreSQL client compatibility
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths: ['.github/workflows/qa-auth-metadata-read-only.yml']
+permissions:
+  contents: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: synthetic-client-container-only
+        options: --health-cmd 'pg_isready -U postgres' --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check only major version and restricted role; no Auth schema, identities or financial data
+        shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          CLIENT_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re,subprocess,json
+          from pathlib import Path
+          existing=Path('.github/workflows/respaldo-misfinanzas.yml').read_text()
+          env=dict(os.environ)
+          for name in ['PGHOST','PGPORT','PGUSER','PGDATABASE']:
+              match=re.search(r'^\s{10}'+name+r':\s*([^\n]+)',existing,re.M)
+              if not match:raise RuntimeError('Existing backup connection metadata unavailable')
+              value=match.group(1).strip().strip('"\'')
+              if not re.fullmatch(r'[A-Za-z0-9._-]+',value):raise RuntimeError('Invalid connection metadata')
+              env[name]=value
+          env['PGSSLMODE']='verify-full';env['PGSSLROOTCERT']='system';env['PGCONNECT_TIMEOUT']='15'
+          cmd=['docker','exec','-i']
+          for name in ['PGHOST','PGPORT','PGUSER','PGDATABASE','PGPASSWORD','PGSSLMODE','PGSSLROOTCERT','PGCONNECT_TIMEOUT']:cmd+=['-e',name]
+          cmd += [env['CLIENT_CONTAINER'],'psql','-X','-qAt','-v','ON_ERROR_STOP=1']
+          sql="BEGIN READ ONLY; SELECT jsonb_build_object('postgres_major',current_setting('server_version_num')::int/10000,'restricted_backup_role',current_user='mf_backup'); ROLLBACK;"
+          result=subprocess.run(cmd,input=sql,text=True,capture_output=True,env=env,timeout=90)
+          if result.returncode:raise RuntimeError('Read-only client compatibility check failed; exit '+str(result.returncode))
+          data=json.loads(result.stdout)
+          if data.get('restricted_backup_role') is not True:raise RuntimeError('Expected restricted backup role')
+          major=data.get('postgres_major')
+          if not isinstance(major,int) or not 14<=major<=17:raise RuntimeError('Client major version needs separate compatibility review')
+          print('PASS verified TLS and restricted role; PostgreSQL major '+str(major))
+          print('No Auth schema, trigger, constraint, privilege details, identity values or financial rows were queried or exported. No artifact generated.')
+          PY
