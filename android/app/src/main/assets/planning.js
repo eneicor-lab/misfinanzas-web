@@ -29,7 +29,7 @@
  function node(tag,text){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e}
  function status(text){$('mfPlanStatus').textContent=text}
  function read(){const raw=localStorage.getItem(KEY);return raw===null?fresh():validate(JSON.parse(raw))}
- function ledger(){const s=JSON.parse(localStorage.getItem(LEDGER)||'{"accounts":{},"events":[]}');if(!s.accounts||!Array.isArray(s.events))fail('Libro local inválido');const balances={};for(const a of Object.values(s.accounts)){if(a.kind!=='asset')continue;const b=root.balanceOf(s,a.id);if(!money(b))fail('Saldo de cuenta inválido');balances[a.id]=b}return {state:s,balances}}
+ function ledger(){const unified=root.MF_APP_STORE?.read().state;const s=unified?unified.bank:JSON.parse(localStorage.getItem(LEDGER)||'{"accounts":{},"events":[]}');if(!s.accounts||!Array.isArray(s.events))fail('Libro local inválido');const balances={};for(const a of Object.values(s.accounts)){if(a.kind!=='asset')continue;const b=root.balanceOf(s,a.id);if(!money(b))fail('Saldo de cuenta inválido');balances[a.id]=b}return {state:unified?{...s,events:root.MF_APP_ENGINE.reportingEvents(unified)}:s,balances}}
  function commit(fn){try{const next=fn(read(),ledger());localStorage.setItem(KEY,JSON.stringify(next));render();status('Planificación guardada en este dispositivo. No se registró ningún movimiento.')}catch(e){status(e.message)}}
  function install(){
   const savings=$('ahorros'),budget=document.querySelector('#planificacion .two .card');if(!savings||!budget)return;
@@ -49,5 +49,5 @@
   $('mfAvailable').replaceChildren();for(const a of accounts){const amount=reserved(s,a.id),available=l.balances[a.id]-amount;const row=node('p',a.name+': saldo '+fmt(l.balances[a.id])+' · reservado '+fmt(amount)+' · sin asignar '+fmt(available));if(available<0){row.className='notice';row.append(node('strong',' Revisa reservas: los movimientos posteriores redujeron el saldo.'))}$('mfAvailable').append(row)}
   $('mfBudgets').replaceChildren();for(const b of s.budgets){const used=spent(l.state.events,b.month,b.category),row=node('div');row.className='item';row.append(node('span',b.month+' · '+b.category+': '+fmt(used)+' / '+fmt(b.limit)+(used>b.limit?' · Límite superado':'')));$('mfBudgets').append(row)}
  }catch(e){status('Bloqueo de integridad: '+e.message+'. Los datos originales se conservan.')}}
- install();
+ root.addEventListener('mf:ledger-change',()=>{if($('mfPlanStatus'))render()});install();
 })(typeof window!=='undefined'?window:globalThis);

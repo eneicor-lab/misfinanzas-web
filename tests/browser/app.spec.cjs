@@ -15,17 +15,17 @@ test('accounts, cash, duplicate protection, persistent reload',async({page})=>{
  for(const [name,type,opening] of [['Banco QA','bank','100000'],['Efectivo QA','cash','20000']]){
  await page.locator('#mf28Account').fill(name);await page.locator('#mf39AccountType').selectOption(type);await page.locator('#mf28Opening').fill(opening);await page.locator('#mf28AddAccount').click();await expect(page.locator('#mf53AccountStatus')).toContainText('Cuenta creada');}
  await page.locator('#mf28Account').fill('Banco QA');await page.locator('#mf39AccountType').selectOption('bank');await page.locator('#mf28AddAccount').click();await expect(page.locator('#mf53AccountStatus')).toContainText('Ya existe');
- await page.reload();expect(await page.evaluate(k=>Object.values(JSON.parse(localStorage.getItem(k)).accounts).filter(a=>/QA$/.test(a.name)).length,KEY)).toBe(2);
+ await page.reload();expect(await page.evaluate(k=>Object.values(MF_APP_STORE.read().state.bank.accounts).filter(a=>/QA$/.test(a.name)).length,KEY)).toBe(2);
 });
 test('income, expense, transfer and insufficient balance through forms',async({page})=>{
  await page.goto('/');await nav(page,'configuracion');for(const name of ['QA origen','QA destino']){await page.locator('#mf28Account').fill(name);await page.locator('#mf28Opening').fill('10000');await page.locator('#mf28AddAccount').click();}
- const ids=await page.evaluate(k=>Object.values(JSON.parse(localStorage.getItem(k)).accounts).filter(a=>a.name.startsWith('QA ')).map(a=>a.id),KEY);
+ const ids=await page.evaluate(k=>Object.values(MF_APP_STORE.read().state.bank.accounts).filter(a=>a.name.startsWith('QA ')).map(a=>a.id),KEY);
  await nav(page,'movimientos');
  for(const [type,amount,third] of [['income','1000','Pagador QA'],['expense','500','Comercio QA'],['transfer','300','']]){
  await page.locator('#mf28Type').selectOption(type);if(type!=='income')await page.locator('#mf28From').selectOption(ids[0]);if(type!=='expense')await page.locator('#mf28To').selectOption(type==='transfer'?ids[1]:ids[0]);
  if(third)await page.locator('#mf53Third').fill(third);await page.locator('#mf28Date').fill('2026-01-01');await page.locator('#mf28Amount').fill(amount);await page.locator('#mf28Concept').fill('QA '+type);await page.locator('#mf28Transaction button[type=submit]').click();await expect(page.locator('#mf28Status')).toContainText('Movimiento registrado');}
- const before=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)).events.length,KEY);
- await page.locator('#mf28Type').selectOption('expense');await page.locator('#mf28From').selectOption(ids[0]);await page.locator('#mf53Third').fill('QA');await page.locator('#mf28Amount').fill('999999');await page.locator('#mf28Transaction button[type=submit]').click();await expect(page.locator('#mf28Status')).toContainText('No se registró');expect(await page.evaluate(k=>JSON.parse(localStorage.getItem(k)).events.length,KEY)).toBe(before);
+ const before=await page.evaluate(k=>MF_APP_STORE.read().state.bank.events.length,KEY);
+ await page.locator('#mf28Type').selectOption('expense');await page.locator('#mf28From').selectOption(ids[0]);await page.locator('#mf53Third').fill('QA');await page.locator('#mf28Amount').fill('999999');await page.locator('#mf28Concept').fill('QA rechazo');await page.locator('#mf28Transaction button[type=submit]').click();await expect(page.locator('#mf28Status')).toContainText('No se registró');expect(await page.evaluate(k=>MF_APP_STORE.read().state.bank.events.length,KEY)).toBe(before);
 });
 test('responsive viewport, labels and keyboard menu',async({page},info)=>{
  await page.goto('/');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
