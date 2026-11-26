@@ -41,7 +41,7 @@ END $$;
 CREATE OR REPLACE FUNCTION mf_next.apply_legacy_plan(p_plan jsonb,p_verified_backup_sha256 text) RETURNS jsonb
  LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE titular uuid;snapshot jsonb;source_hash text;plan_hash text;existing mf_next.legacy_imports%ROWTYPE;
- book jsonb;r record;e jsonb;a jsonb;m text;payload jsonb;modules jsonb:='{}';n bigint;
+ book jsonb;r record;e jsonb;a jsonb;m text;payload jsonb;modules jsonb:='{}';n bigint;expected_catalogs jsonb;expected_reminders jsonb;expected_counts jsonb;cash numeric;
 BEGIN
  IF jsonb_typeof(p_plan) IS DISTINCT FROM 'object' OR p_plan->'scope' IS DISTINCT FROM '"legacy_assets_only"'::jsonb OR p_plan->'version' IS DISTINCT FROM '1'::jsonb OR p_plan->'ready' IS DISTINCT FROM 'true'::jsonb OR p_plan->'blockers' IS DISTINCT FROM '[]'::jsonb
   OR p_verified_backup_sha256 IS NULL OR p_verified_backup_sha256!~'^[0-9a-f]{64}$' THEN RAISE EXCEPTION 'Reviewed ready plan and verified backup digest required'; END IF;
@@ -70,7 +70,18 @@ BEGIN
  FOR r IN SELECT * FROM public.mf_accounts WHERE owner_id=titular LOOP
   a:=book->'bank'->'accounts'->r.id::text;
   IF a IS NULL OR a->>'id'<>r.id::text OR a->>'name' IS DISTINCT FROM r.name OR a->>'kind'<>'asset' OR (a->>'opening')::numeric<>r.opening THEN RAISE EXCEPTION 'Account reconciliation mismatch'; END IF;
+  SELECT r.opening+coalesce(sum(CASE WHEN to_account=r.id THEN amount ELSE 0 END),0)-coalesce(sum(CASE WHEN from_account=r.id THEN amount ELSE 0 END),0)
+   INTO cash FROM public.mf_events WHERE owner_id=titular;
+  IF (p_plan->'balances'->r.id::text->>'source')::numeric IS DISTINCT FROM cash OR (p_plan->'balances'->r.id::text->>'target')::numeric IS DISTINCT FROM cash THEN RAISE EXCEPTION 'Balance report mismatch'; END IF;
  END LOOP;
+ SELECT jsonb_object_agg(key,jsonb_array_length(value)) INTO expected_counts FROM jsonb_each(snapshot->'tables');
+ IF p_plan->'source_counts' IS DISTINCT FROM expected_counts THEN RAISE EXCEPTION 'Source inventory mismatch'; END IF;
+ IF EXISTS(SELECT 1 FROM public.mf_beneficiaries WHERE owner_id=titular AND kind NOT IN('person','persona','pet','mascota','household','hogar')) THEN RAISE EXCEPTION 'Unknown beneficiary type'; END IF;
+ SELECT jsonb_build_object('categories',coalesce((SELECT jsonb_agg(jsonb_build_object('id',id,'name',name,'type',CASE kind WHEN 'income' THEN 'Ingreso' ELSE 'Gasto' END,'parent',parent_id,'active',active) ORDER BY id::text COLLATE "C") FROM public.mf_categories WHERE owner_id=titular),'[]'::jsonb),
+  'people',coalesce((SELECT jsonb_agg(jsonb_build_object('id',id,'name',name,'kind',CASE kind WHEN 'person' THEN 'persona' WHEN 'pet' THEN 'mascota' WHEN 'household' THEN 'hogar' ELSE kind END,'legacyKind',kind,'active',active) ORDER BY id::text COLLATE "C") FROM public.mf_beneficiaries WHERE owner_id=titular),'[]'::jsonb),'bills','[]'::jsonb) INTO expected_catalogs;
+ SELECT coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'type',frequency,'date',first_due,'endDate',end_date,'amount',amount,'paused',coalesce(paused,false),'cancelled',false,'leads','[0]'::jsonb,'legacyAccountId',account_id,'autoPost',false) ORDER BY id::text COLLATE "C"),'[]'::jsonb)
+  INTO expected_reminders FROM public.mf_obligations WHERE owner_id=titular;
+ IF p_plan->'modules'->'catalogs' IS DISTINCT FROM expected_catalogs OR p_plan->'modules'->'reminders' IS DISTINCT FROM expected_reminders THEN RAISE EXCEPTION 'Catalog/reminder reconciliation mismatch'; END IF;
  IF jsonb_array_length(book->'bank'->'events')<>(SELECT count(*) FROM public.mf_events WHERE owner_id=titular) THEN RAISE EXCEPTION 'Event count mismatch'; END IF;
  FOR r IN SELECT * FROM public.mf_events WHERE owner_id=titular LOOP
   SELECT value INTO STRICT e FROM jsonb_array_elements(book->'bank'->'events') WHERE value->>'id'=r.id::text;
@@ -79,8 +90,8 @@ BEGIN
    OR (e->>'amount')::numeric IS DISTINCT FROM r.amount OR e->>'concept' IS DISTINCT FROM r.concept THEN RAISE EXCEPTION 'Event reconciliation mismatch'; END IF;
  END LOOP;
  FOR r IN SELECT a.*,c.name category_name FROM public.mf_allocations a LEFT JOIN public.mf_categories c ON(c.id,c.owner_id)=(a.category_id,a.owner_id) WHERE a.owner_id=titular LOOP
-  SELECT x INTO a FROM jsonb_array_elements(book->'bank'->'events') e, LATERAL jsonb_array_elements(coalesce(e->'allocations','[]')) x
-   WHERE e->>'id'=r.event_id::text AND x->>'legacyAllocationId'=r.id::text;
+  SELECT alloc.item INTO a FROM jsonb_array_elements(book->'bank'->'events') AS event_row(item), LATERAL jsonb_array_elements(coalesce(event_row.item->'allocations','[]')) AS alloc(item)
+   WHERE event_row.item->>'id'=r.event_id::text AND alloc.item->>'legacyAllocationId'=r.id::text;
   IF a IS NULL OR (a->>'amount')::numeric IS DISTINCT FROM r.amount OR a->>'category' IS DISTINCT FROM coalesce(r.category_name,'Sin categoría') THEN RAISE EXCEPTION 'Allocation reconciliation mismatch'; END IF;
  END LOOP;
  FOR m IN SELECT key FROM jsonb_each(p_plan->'modules') LOOP IF m NOT IN('catalogs','reminders') THEN RAISE EXCEPTION 'Unexpected import module'; END IF; END LOOP;
