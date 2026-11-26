@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [integration/misfinanzas-2.7-rc2]
-    paths: ['.github/workflows/qa-auth-metadata-read-only.yml']
+    paths: ['.github/workflows/qa-auth-metadata-read-only.yml','sql/certs/supabase-root.crt']
 permissions:
   contents: read
 jobs:
@@ -30,7 +30,9 @@ jobs:
             exit 1
           fi
           cp sql/certs/supabase-root.crt /tmp/mf-supabase-root.crt
+          echo '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7  /tmp/mf-supabase-root.crt' | sha256sum -c -
           openssl x509 -in /tmp/mf-supabase-root.crt -noout -checkend 86400
+          openssl verify -CAfile /tmp/mf-supabase-root.crt /tmp/mf-supabase-root.crt
           docker cp /tmp/mf-supabase-root.crt "$CLIENT_CONTAINER:/tmp/mf-supabase-root.crt"
           python3 - <<'PY'
           import os,re,subprocess,json
