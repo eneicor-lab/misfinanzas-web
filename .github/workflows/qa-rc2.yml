@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regression:
-    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
           name: regression-${{ github.sha }}
           path: evidence/
   browser:
-    if: ${{ !contains(github.event.head_commit.message, '[database-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +109,9 @@ jobs:
             sleep 5
             adb shell pidof co.misfinanzas.dev > artifacts/android-pid.txt
             adb exec-out screencap -p > artifacts/android-screen.png
-            adb logcat -d -s AndroidRuntime:E > artifacts/android-runtime.log
+            for attempt in $(seq 1 15); do if adb logcat -d -s MisFinanzasQA:I | grep -q 'web_ready=true'; then break; fi; sleep 2; done
+            adb logcat -d -s MisFinanzasQA:I AndroidRuntime:E > artifacts/android-runtime.log
+            grep -q 'web_ready=true' artifacts/android-runtime.log
             test -s artifacts/android-pid.txt
             if grep -q 'FATAL EXCEPTION' artifacts/android-runtime.log; then exit 1; fi
             adb shell uiautomator dump /sdcard/window.xml || true
@@ -120,7 +122,7 @@ jobs:
           name: android-rc2-${{ github.sha }}
           path: artifacts/
   database:
-    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[ui-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[ui-only]') && !contains(github.event.head_commit.message, '[android-only]') }}
     runs-on: ubuntu-24.04
     services:
       postgres:

@@ -2,6 +2,8 @@ package co.misfinanzas.dev;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.content.pm.ApplicationInfo;
+import android.util.Log;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
@@ -28,6 +30,15 @@ public final class MainActivity extends Activity {
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", new AssetsPathHandler(this)).build();
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                boolean debug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+                if (debug && "https://appassets.androidplatform.net/assets/index.html".equals(url)) {
+                    view.evaluateJavascript(
+                        "Boolean(window.isSecureContext && navigator.locks && window.MF_APP_STORE && document.getElementById('mfUnifiedOverview'))",
+                        result -> Log.i("MisFinanzasQA", "web_ready=" + result));
+                }
+            }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return loader.shouldInterceptRequest(request.getUrl());
             }
