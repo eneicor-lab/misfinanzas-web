@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regression:
-    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[database-only]') && !contains(github.event.head_commit.message, '[ui-only]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -43,9 +43,11 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run affected browser scope
         env:
-          MF_QA_SCOPE: ${{ contains(github.event.head_commit.message, '[sync-only]') && 'sync' || contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
+          MF_QA_SCOPE: ${{ contains(github.event.head_commit.message, '[ui-only]') && 'unified-ui' || contains(github.event.head_commit.message, '[sync-only]') && 'sync' || contains(github.event.head_commit.message, '[browser-only]') && 'browser-login' || 'full' }}
         run: |
-          if [[ "$MF_QA_SCOPE" == 'sync' ]]; then
+          if [[ "$MF_QA_SCOPE" == 'unified-ui' ]]; then
+            npx playwright test tests/browser/app.spec.cjs tests/browser/products.spec.cjs tests/browser/planning.spec.cjs tests/browser/unified-ledger.spec.cjs
+          elif [[ "$MF_QA_SCOPE" == 'sync' ]]; then
             npx playwright test tests/browser/module-sync.spec.cjs
           elif [[ "$MF_QA_SCOPE" == 'browser-login' ]]; then
             npx playwright test tests/browser/app.spec.cjs --project=mobile --grep 'mock authentication'
@@ -118,7 +120,7 @@ jobs:
           name: android-rc2-${{ github.sha }}
           path: artifacts/
   database:
-    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[browser-only]') && !contains(github.event.head_commit.message, '[ui-only]') }}
     runs-on: ubuntu-24.04
     services:
       postgres:

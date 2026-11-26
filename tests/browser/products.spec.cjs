@@ -12,6 +12,6 @@ test('loan registration and scheduling preserve principal until a confirmed paym
  const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('misfinanzas_deudas_demo_v43')));expect(state.loans[0].principal).toBe(120000);await expect(page.locator('#mf43History')).not.toContainText('Sin operaciones.');
 });
 test('credit cards and installment purchases preserve their independent plan',async({page})=>{
- await nav(page,'deudas');await page.locator('#mf45TabCards').click();await page.locator('#mf45CardName').fill('Tarjeta QA');await page.locator('#mf45CardLimit').fill('1000000');await page.locator('#mf45CardNew button[type=submit]').click();await expect(page.locator('#mf45CardSummary')).toContainText('Tarjeta QA');
+ await nav(page,'deudas');await page.locator('#mfHistoricalDebt > summary').click();await page.locator('#mf45TabCards').click();await page.locator('#mf45CardName').fill('Tarjeta QA');await page.locator('#mf45CardLimit').fill('1000000');await page.locator('#mf45CardNew button[type=submit]').click();await expect(page.locator('#mf45CardSummary')).toContainText('Tarjeta QA');
  await page.locator('#mf45PurchaseName').fill('Compra sintética');await page.locator('#mf45PurchaseAmount').fill('120000');await page.locator('#mf45PurchaseTerms').fill('12');await page.locator('#mf45PurchasePaid').fill('0');await page.locator('#mf45Purchase button[type=submit]').click();await expect(page.locator('#mf45CardsPanel')).toContainText('Compra sintética');
 });
