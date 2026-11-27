@@ -1,0 +1,26 @@
+const {test,expect}=require('@playwright/test');
+const {fresh}=require('../make-book-fixture.cjs');
+test('integrated financial journey and responsive shell with synthetic transport',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));const modules={book:{revision:1,payload:structuredClone(fresh)},catalogs:{revision:1,payload:{categories:[{id:'food',name:'Alimentación'}],people:[],bills:[]}}};const owner='11111111-1111-4111-8111-111111111111';
+ await page.route('https://yjzgpspxvmimduuemxms.supabase.co/**',async route=>{const request=route.request(),u=new URL(request.url());let body;
+  if(u.pathname==='/auth/v1/token')body={access_token:'synthetic-token',refresh_token:'synthetic-refresh',expires_in:3600,user:{id:owner,email:'synthetic@example.invalid',email_confirmed_at:'2026-01-01'}};
+  else if(u.pathname.endsWith('/book_sync_contract'))body={version:1,protected:true,enabled:true,authorized:true};
+  else if(u.pathname.endsWith('/get_module_state')){const m=modules[u.searchParams.get('p_module')];body=m?[m]:[];}
+  else if(u.pathname.endsWith('/put_module_state')){const d=request.postDataJSON(),prior=modules[d.p_module]?.revision||0;if(prior!==d.p_expected_revision)return route.fulfill({status:409,json:{message:'Synthetic revision conflict'}});body=prior+1;modules[d.p_module]={revision:body,payload:d.p_payload};}
+  else if(u.pathname.endsWith('/release_status'))body={test_mode:true,can_launch:true,phase:'testing',test_owner:owner};
+  else if(u.pathname==='/auth/v1/logout')body={};else throw Error('Unexpected service request '+u.pathname);
+  return route.fulfill({status:200,json:body});
+ });
+ await page.goto('/integrated.html');await page.getByLabel('Correo',{exact:true}).fill('synthetic@example.invalid');await page.getByLabel('Contraseña',{exact:true}).fill('Synthetic+Access!123');await page.getByRole('button',{name:'Iniciar sesión',exact:true}).click();
+ await expect(page.locator('#application')).toBeVisible();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.locator('#connection')).toContainText('sincronizada');
+ await page.locator('#userIdentity').click();await expect(page.getByRole('button',{name:'Lanzar definitiva',exact:true})).toBeVisible();await page.locator('#userIdentity').click();
+ await page.getByRole('button',{name:'Cuentas',exact:true}).click();await page.getByRole('button',{name:'Nueva cuenta',exact:true}).click();await page.getByLabel('Nombre',{exact:true}).fill('Cuenta del recorrido');await page.getByLabel('Saldo inicial COP').fill('100000');await page.getByRole('button',{name:'Guardar',exact:true}).click();await expect(page.getByRole('cell',{name:'Cuenta del recorrido',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Movimientos',exact:true}).click();await page.getByRole('button',{name:'Ingreso',exact:true}).click();await page.getByLabel('Importe en COP').fill('10000');await page.getByLabel('Concepto',{exact:true}).fill('Ingreso del recorrido');await page.getByRole('button',{name:'Guardar',exact:true}).click();await expect(page.getByRole('cell',{name:'Ingreso · Ingreso del recorrido',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Gasto',exact:true}).click();await page.getByLabel('Importe en COP').fill('1000');await page.getByLabel('Concepto',{exact:true}).fill('Gasto del recorrido');await page.getByRole('button',{name:'Guardar',exact:true}).click();await expect(page.getByRole('cell',{name:'Gasto · Gasto del recorrido',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Obligaciones y suscripciones',exact:true}).click();await page.getByRole('button',{name:'Agregar obligación o suscripción'}).click();await page.getByLabel('Nombre',{exact:true}).fill('Suscripción semestral');await page.getByLabel('Importe COP',{exact:true}).fill('20000');await page.getByLabel('Periodicidad',{exact:true}).selectOption('semiannual');await page.getByRole('button',{name:'Guardar',exact:true}).click();await expect(page.getByRole('cell',{name:'Suscripción semestral',exact:true})).toBeVisible();
+ await page.locator('#userIdentity').click();await page.getByRole('button',{name:'Acerca de',exact:true}).click();await expect(page.locator('#content')).toContainText('Creado por: Eduardo Neisa Cortés');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect(errors).toEqual([]);
+ await expect.poll(()=>modules.book.payload.bank.events.length).toBe(2);expect(modules.reminders.payload[0].type).toBe('semiannual');
+ await page.screenshot({path:`evidence/integrated-${test.info().project.name}.png`,fullPage:true});
+ await page.locator('#userIdentity').click();await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await expect(page.locator('#access')).toBeVisible();
+});
