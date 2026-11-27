@@ -69,5 +69,5 @@
   }catch(e){$('mfFinalRecoveryStatus').textContent='La recuperación inicial quedó pendiente sin borrar la copia previa. Reintenta o vuelve a iniciar sesión. '+e.message;}finally{recovering=false;$('mfFinalRecoveryRetry').disabled=false;}
  }
  $('mfFinalRecoveryRetry').onclick=()=>{if(finalState)void recoverFinal(finalState)};
- root.addEventListener('mf:auth-ready',()=>{void refresh()});root.addEventListener('mf:auth-closed',()=>{generation++;card.hidden=true});
+ root.addEventListener('mf:auth-ready',()=>{void refresh()});root.addEventListener('mf:auth-closed',()=>{generation++;state=null;finalState=null;card.hidden=true;if(dialog.open)dialog.close();if(recovery.open)recovery.close();$('mfReleasePassword').value='';$('mfReleasePasswordConfirm').value='';});
 })(typeof window!=='undefined'?window:globalThis);

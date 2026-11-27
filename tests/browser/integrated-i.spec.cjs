@@ -23,4 +23,6 @@ test('integrated financial journey and responsive shell with synthetic transport
  await expect.poll(()=>modules.book.payload.bank.events.length).toBe(2);expect(modules.reminders.payload[0].type).toBe('semiannual');
  await page.screenshot({path:`evidence/integrated-${test.info().project.name}.png`,fullPage:true});
  await page.locator('#userIdentity').click();await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await expect(page.locator('#access')).toBeVisible();
+ await page.getByLabel('Correo',{exact:true}).fill('synthetic@example.invalid');await page.getByLabel('Contraseña',{exact:true}).fill('Synthetic+Access!123');await page.getByRole('button',{name:'Iniciar sesión',exact:true}).click();await expect(page.locator('#application')).toBeVisible();await page.getByRole('button',{name:'Cuentas',exact:true}).click();await expect(page.getByRole('cell',{name:'Cuenta del recorrido',exact:true})).toBeVisible();
+ const persisted=await page.evaluate(()=>JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)]))));expect(persisted).not.toContain('Synthetic+Access!123');expect(persisted).not.toContain('Ingreso del recorrido');
 });
