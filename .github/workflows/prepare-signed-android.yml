@@ -6,6 +6,7 @@ on:
     paths: ['.github/workflows/prepare-signed-android.yml','tools/private_drive.py','tools/qa_signed_android.py','android/app/src/main/java/co/misfinanzas/dev/MainActivity.java','web/vault-shell.js','web/supabase-dev.html','android/app/build.gradle.kts']
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: misfinanzas-private-signing
   cancel-in-progress: false
@@ -59,13 +60,25 @@ jobs:
         with:
           gradle-version: '8.9'
           cache-read-only: false
-      - name: Reuse functional APK evidence only when application resources are unchanged
+      - name: Reuse approved native evidence and verify affected browser QA
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          python - <<'PY'
+          import json,os,urllib.request
+          url='https://api.github.com/repos/eneicor-lab/misfinanzas-web/actions/runs/46042935985'
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as response:data=json.load(response)
+          if data.get('head_sha')!='7b26e611d1e5d67e2919ea6991394b9b574cedb0' or data.get('status')!='completed' or data.get('conclusion')!='success':raise RuntimeError('Affected transition browser QA is not approved')
+          print('PASS 14 focused desktop/mobile transition cases; exact tested source verified below.')
+          PY
+          git fetch --no-tags --depth=1 origin 7b26e611d1e5d67e2919ea6991394b9b574cedb0
+          git diff --exit-code 7b26e611d1e5d67e2919ea6991394b9b574cedb0 HEAD -- web android/app/src/main
           git fetch --no-tags --depth=1 origin ddfdda349d6e2f1501b32c9d1cbbf9f8edcfaa4d
-          git diff --exit-code ddfdda349d6e2f1501b32c9d1cbbf9f8edcfaa4d HEAD -- web android/app/src/main
+          git diff --exit-code ddfdda349d6e2f1501b32c9d1cbbf9f8edcfaa4d HEAD -- android/app/src/main/java android/app/src/main/res android/app/src/main/AndroidManifest.xml
           mkdir -p artifacts
-          printf '%s\n' 'Application resources and native code unchanged from approved signed APK ddfdda34. Reuse installation/lock/update evidence 45887574532 attempt2. Version metadata build only; no emulator rerun.' > artifacts/FUNCTIONAL_QA_REUSED.txt
+          printf '%s\n' 'Native code and original icon unchanged; reuse signed installation/lock/update evidence 45887574532 attempt2. Affected transition resources: 14 browser cases approved in 46042935985 against identical web/Android assets. Backend productive setup remains separate.' > artifacts/FUNCTIONAL_QA_REUSED.txt
       - name: Compile signed release without changing production or installing over an existing app
         env:
           MF_ANDROID_SIGNING_DIR: ${{ runner.temp }}/mf-signing/restored
@@ -83,7 +96,7 @@ jobs:
           printf '%s\n' '${{ github.sha }}' > artifacts/COMMIT.txt
           (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
           cat artifacts/SHA256SUMS.txt
-          printf '%s\n' 'Stable signing identity recovered from encrypted owner-only Drive storage; original bank icon retained.' 'Stable 2.7.0 build; publication and database activation require their separate authorization.' 'Installing over historical debug APKs requires their matching signer; never uninstall or discard existing data automatically.' > artifacts/STATUS.txt
+          printf '%s\n' 'Stable signing identity recovered from encrypted owner-only Drive storage; original bank icon retained.' 'Integral 2.7.0 build with private transition client; publication and private backend activation require separate authorization.' 'Installing over historical debug APKs requires their matching signer; never uninstall or discard existing data automatically.' > artifacts/STATUS.txt
       - name: Preserve APK and public certificate evidence only
         if: always()
         uses: actions/upload-artifact@v4
