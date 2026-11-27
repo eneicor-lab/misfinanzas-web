@@ -46,6 +46,19 @@ export class Vault{
    return true;
   }catch(error){this.lock();throw Error(/tag|decrypt/i.test(error.message)?'La clave no coincide o la copia fue alterada':error.message);}
  }
+ async changePassphrase(passphrase){
+  this.#opened();if(!strongPassphrase(passphrase))throw Error('La nueva clave local no cumple los requisitos');
+  const epoch=this.#epoch,current=this.#read(),salt=this.#crypto.getRandomValues(new Uint8Array(16));
+  const input=encoder.encode(passphrase);let material;try{material=await this.#crypto.subtle.importKey('raw',input,'PBKDF2',false,['deriveBits']);}finally{input.fill(0);}
+  const next=new Uint8Array(await this.#crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:KDF_ITERATIONS,hash:'SHA-256'},material,256));
+  if(epoch!==this.#epoch||!this.unlocked){next.fill(0);throw Error('El cambio se canceló al bloquear la aplicación');}
+  if(this.#read().raw!==current.raw){next.fill(0);throw Error('La copia local cambió; reintenta sin perder los cambios');}
+  const archive='__mf_vault_before_rekey_'+this.#crypto.randomUUID();
+  try{this.#native.setItem(archive,current.raw);if(this.#native.getItem(archive)!==current.raw)throw Error('No se confirmó la copia previa');}catch(error){next.fill(0);throw error;}
+  const oldKey=this.#key,oldMeta=this.#meta;this.#key=next;const meta={...current.meta,salt:b64(salt)};
+  try{current.data.revision++;this.#write(current.data,meta,current.raw);oldKey.fill(0);return {archive};}
+  catch(error){this.#key=oldKey;this.#meta=oldMeta;next.fill(0);throw error;}
+ }
  lock(){this.#epoch++;if(this.#key)this.#key.fill(0);this.#key=null;this.#meta=null;if(this.#release)this.#release();this.#release=null;}
  keys(){const {data}=this.#read();const keys=Object.keys(data.values);for(let i=0;i<this.#native.length;i++){const k=this.#native.key(i);if(k!==KEY&&!protectedKey(k))keys.push(k);}return keys;}
  get(k){this.#opened();if(k===KEY)throw Error('La copia cifrada se exporta desde la pantalla de acceso');if(!protectedKey(k))return this.#native.getItem(k);const {data}=this.#read();if(this.#native.getItem(k)!==null)throw Error('Otra versión está escribiendo sin cifrar; cierra esa pestaña y conserva el respaldo');return data.values[k]??null;}

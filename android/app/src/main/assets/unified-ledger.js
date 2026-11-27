@@ -26,6 +26,11 @@
   }
   function replaceBank(s,bank){check(s);if(s.bank.events.some((e,i)=>!bank.events[i]||!S.sameRequest(e,bank.events[i])))fail('No se puede reemplazar el historial del libro');return check(align({...clone(s),bank:clone(bank)}))}
   function postBank(s,p){check(s);const r=B.post(s.bank,p);return {state:check(align({...clone(s),bank:r.state})),duplicate:!r.posted}}
+  function adjustOpening(s,p){check(s);const account=s.bank.accounts[p.accountId];if(!account||!money(p.target)||typeof p.reason!=='string'||p.reason.trim().length<15||p.reason.length>100)fail('Revisa cuenta, saldo y motivo detallado de la corrección');
+   const prior=s.bank.events.find(e=>e.id===p.id||e.key===p.key);if(prior){if(prior.financialClass!=='opening_adjustment'||prior.openingTarget!==p.target||prior.adjustedAccount!==p.accountId||prior.concept!==p.reason||prior.date!==p.date)fail('Conflicto de idempotencia en la corrección');return {state:clone(s),duplicate:true};}
+   const effective=account.opening+S.sum((s.bank.openingAdjustments||[]).filter(a=>a.accountId===p.accountId).map(a=>a.delta))+S.sum(s.bank.events.filter(e=>e.financialClass==='opening_adjustment'&&e.adjustedAccount===p.accountId).map(e=>e.type==='income'?e.amount:-e.amount));
+   const delta=p.target-effective;if(!delta)fail('El saldo inicial ya coincide');return postBank(s,{id:p.id,key:p.key,date:p.date,type:delta>0?'income':'expense',...(delta>0?{to:p.accountId}:{from:p.accountId}),amount:Math.abs(delta),concept:p.reason,financialClass:'opening_adjustment',adjustedAccount:p.accountId,openingTarget:p.target});
+  }
   function addLoan(s,p){check(s);return check({...clone(s),debt:E.addLoan(s.debt,{...p,openingPrincipal:p.principal,openingPaidTerms:p.paidTerms})})}
   function addCard(s,p){check(s);return check({...clone(s),debt:E.addCard(s.debt,p)})}
   function postDebt(s,p){check(s);const result=E.post(s.debt,p);if(result.duplicate)return {state:clone(s),duplicate:true};let bank=clone(s.bank);
@@ -35,9 +40,9 @@
    }
    return {state:check({version:1,bank,debt:result.state}),duplicate:false};
   }
-  function reportingEvents(s){check(s);const events=s.bank.events.filter(e=>e.financialClass!=='debt_payment').map(clone);for(const p of s.debt.entries)for(const j of p.journal||[])if(j.type.startsWith('expense_')&&j.delta>0)events.push({id:p.id+':'+j.type,type:'expense',date:p.date,amount:j.delta,concept:p.name||'Costo de deuda',category:p.category||(j.type==='expense_purchase'?'Compras con tarjeta':'Costos de deuda'),from:p.accountId||null});return events}
+  function reportingEvents(s){check(s);const events=s.bank.events.filter(e=>!['debt_payment','opening_adjustment'].includes(e.financialClass)).map(clone);for(const p of s.debt.entries)for(const j of p.journal||[])if(j.type.startsWith('expense_')&&j.delta>0)events.push({id:p.id+':'+j.type,type:'expense',date:p.date,amount:j.delta,concept:p.name||'Costo de deuda',category:p.category||(j.type==='expense_purchase'?'Compras con tarjeta':'Costos de deuda'),from:p.accountId||null});return events}
   function totals(s,month){const events=reportingEvents(s).filter(e=>!month||e.date.startsWith(month));const income=S.sum(events.filter(e=>e.type==='income').map(e=>e.amount)),expense=S.sum(events.filter(e=>e.type==='expense').map(e=>e.amount));return {income,expense,net:income-expense}}
-  return {fresh,check,replaceBank,postBank,addLoan,addCard,postDebt,reportingEvents,totals};
+  return {fresh,check,replaceBank,postBank,adjustOpening,addLoan,addCard,postDebt,reportingEvents,totals};
  }
  class Store{
   constructor({storage,engine,locks,onChange=()=>{}}){this.storage=storage;this.engine=engine;this.locks=locks;this.onChange=onChange}
