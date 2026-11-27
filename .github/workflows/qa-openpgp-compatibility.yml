@@ -1,0 +1,41 @@
+# Public synthetic test vector only: no backup, identity, private procedure or secret.
+name: QA public OpenPGP interoperability
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths: [.github/workflows/qa-openpgp-compatibility.yml]
+permissions:
+  contents: read
+jobs:
+  public-fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Verify maintained pgcrypto OpenPGP output with GnuPG
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          export GNUPGHOME="$RUNNER_TEMP/public-openpgp-qa"
+          mkdir -p "$GNUPGHOME"
+          cd "$GNUPGHOME"
+          printf '%s' 'ww0ECQMIFCWEle+F857/0m8BLr5xQT4i4cCfutSlbhpqN53Gw7HcNVXYkE3vzkA8geIVbjlSoN6rWa93ApEjmdBiU7Db2R1ZOhTB+ngVdbEl6iEDzirKD0b/bBztxqYzLXjoEtUzLlNP6U1oitbyIV7QibfLRHZgE6CQCL/7vCU=' | base64 --decode > fixture.gpg
+          echo '657655d98cf490273e73990ef3fb26068f9aaf17a74abc529e330a7aebe1af12  fixture.gpg' | sha256sum -c -
+          printf '%s\n' 'MisFinanzas public synthetic OpenPGP compatibility fixture v1' > expected.txt
+          # This literal is a PUBLIC fixture password; never used with any backup.
+          printf '%s' 'MisFinanzas-public-QA-only-not-a-secret' | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --decrypt fixture.gpg > recovered.txt
+          cmp expected.txt recovered.txt
+          if printf '%s' 'wrong-public-fixture-password' | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --decrypt fixture.gpg > wrong.txt 2> wrong.log; then
+            echo 'ERROR: wrong password accepted'; exit 1
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          data=bytearray(Path('fixture.gpg').read_bytes())
+          data[-1]^=1
+          Path('tampered.gpg').write_bytes(data)
+          PY
+          if printf '%s' 'MisFinanzas-public-QA-only-not-a-secret' | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --decrypt tampered.gpg > tampered.txt 2> tampered.log; then
+            echo 'ERROR: corrupted encrypted fixture accepted'; exit 1
+          fi
+          echo 'PASS: GnuPG decrypts pgcrypto AES256 OpenPGP fixture exactly; rejects wrong key and corrupted ciphertext.'
