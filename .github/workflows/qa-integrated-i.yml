@@ -84,6 +84,7 @@ jobs:
       - name: Exercise integrated UI with real isolated services
         env:
           MF_QA_CONTAINER: ${{ job.services.postgres.id }}
+          MF_PRIVATE_RELEASE_QA: ${{ secrets.MF_PRIVATE_RELEASE_QA }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/mf-auth /tmp/mf-postgrest evidence

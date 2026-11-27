@@ -48,7 +48,7 @@
   const api=bridge();let proof;const password=$('mfReleasePassword').value;try{proof=await api.verifyFinal($('mfReleaseEmail').value.trim(),password);const result=await api.release('finalize',{job_id:state.job_id,manifest_sha:state.manifest_sha,confirmation:'LANZAR DEFINITIVA',identified_test_data:true,target_access_token:proof});display(result);}finally{$('mfReleasePassword').value='';$('mfReleasePasswordConfirm').value='';if(proof)await api.revokeFinal(proof);}
   const result=state;
   display(result);if(!finalReceipt(result))throw Error('La transición requiere reanudación; no se repetirá una limpieza completada');
-  root.MF_RELEASE_LOCKED=false;dialog.close();root.parent.MF_PRIVATE_LOCK?.('Transición terminada. Abre tu bóveda e inicia sesión con la cuenta definitiva. Android utilizará esa misma cuenta.');
+  root.MF_RELEASE_LOCKED=false;dialog.close();if(root.MF_RELEASE_COMPLETED)await root.MF_RELEASE_COMPLETED(result);else root.parent.MF_PRIVATE_LOCK?.('Transición terminada. Abre tu bóveda e inicia sesión con la cuenta definitiva. Android utilizará esa misma cuenta.');
  });
  $('mfReleaseCancel').onclick=()=>action(async()=>{if(!state?.job_id){dialog.close();return;}display(await bridge().release('cancel',{job_id:state.job_id}));root.MF_RELEASE_LOCKED=false;dialog.close();});
  $('mfReleaseClose').onclick=()=>{$('mfReleasePassword').value='';$('mfReleasePasswordConfirm').value='';if(state?.phase==='testing'||finalReceipt(state))dialog.close();};dialog.addEventListener('cancel',e=>{if(state?.phase!=='testing'&&!finalReceipt(state))e.preventDefault()});
