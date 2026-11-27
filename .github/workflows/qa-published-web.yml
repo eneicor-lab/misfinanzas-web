@@ -8,6 +8,7 @@ permissions:
   contents: read
 jobs:
   https-delivery:
+    if: ${{ !contains(github.event.head_commit.message, '[delivery-only]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     steps:
@@ -25,6 +26,7 @@ jobs:
           retention-days: 30
   android-download:
     needs: https-delivery
+    if: ${{ always() && (needs['https-delivery'].result == 'success' || contains(github.event.head_commit.message, '[delivery-only]')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     permissions:
@@ -38,8 +40,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin 0dd1e1642a2337e5bca1da89cb4008be76293ca4 10eb3780da53acb686fda75a5e965eb13793a3ff
-          git diff --exit-code 0dd1e1642a2337e5bca1da89cb4008be76293ca4 10eb3780da53acb686fda75a5e965eb13793a3ff -- web android/app/src/main android/app/build.gradle.kts package.json
+          test "$(gh api repos/$GITHUB_REPOSITORY/actions/jobs/140746696325 --jq .conclusion)" = success
+          git fetch --no-tags --depth=1 origin 0dd1e1642a2337e5bca1da89cb4008be76293ca4
+          git diff --exit-code 0dd1e1642a2337e5bca1da89cb4008be76293ca4 HEAD -- web android/app/src/main android/app/build.gradle.kts package.json
           dir="$RUNNER_TEMP/mf-signed-delivery"
           mkdir -p "$dir"
           gh run download 46043307612 --repo "$GITHUB_REPOSITORY" --name signed-android-0dd1e1642a2337e5bca1da89cb4008be76293ca4 --dir "$dir"
@@ -59,4 +62,5 @@ jobs:
 
           APK fuente: 0dd1e1642a2337e5bca1da89cb4008be76293ca4. Fuente integrada de aplicación idéntica: 10eb3780da53acb686fda75a5e965eb13793a3ff.
           NOTES
-          gh release create v2.7.0 MisFinanzas-2.7.0-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt --repo "$GITHUB_REPOSITORY" --target 10eb3780da53acb686fda75a5e965eb13793a3ff --title 'MisFinanzas 2.7.0 — Web y Android' --notes-file RELEASE_NOTES.md
+          printf '%s\n' "Publicación ejecutada desde: $GITHUB_SHA; código de aplicación idéntico al APK aprobado." >> RELEASE_NOTES.md
+          gh release create v2.7.0 MisFinanzas-2.7.0-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'MisFinanzas 2.7.0 — Web y Android' --notes-file RELEASE_NOTES.md
