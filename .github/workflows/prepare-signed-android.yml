@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   signed-apk:
-    if: github.ref == 'refs/heads/integration/misfinanzas-2.7-rc2'
+    if: github.ref == 'refs/heads/integration/misfinanzas-2.7-rc2' && !contains(github.event.head_commit.message, '[transition-wip]')
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     defaults:
