@@ -20,6 +20,7 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: node tests/vault-rekey-i.test.cjs
+      - run: node tests/vault-remote-recovery-i.test.cjs
       - run: node tests/opening-correction-i.test.cjs
       - run: npx playwright test --config=playwright.integrated.config.cjs --grep-invert 'real isolated'
       - uses: actions/upload-artifact@v4
