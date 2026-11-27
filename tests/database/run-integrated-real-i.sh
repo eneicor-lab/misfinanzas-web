@@ -50,6 +50,10 @@ fi
 pg -d postgres -c 'CREATE ROLE service_role NOLOGIN BYPASSRLS;'
 docker cp tests/database/legacy-contract.sql "$MF_QA_CONTAINER:/legacy-contract.sql"
 pg -d postgres -f /legacy-contract.sql
+pg -d postgres -f /sql/011_legacy_migration_candidate.sql
+pg -d postgres -c "ALTER SYSTEM SET log_min_error_statement='panic';"
+pg -d postgres -c "ALTER SYSTEM SET log_error_verbosity='terse';"
+pg -d postgres -c 'SELECT pg_reload_conf();'
 node tests/private-release-service-i.cjs prepare
 docker cp "$RUNNER_TEMP/mf-release-private.sql" "$MF_QA_CONTAINER:/mf-release-private.sql"
 if ! pg -d postgres -f /mf-release-private.sql > "$RUNNER_TEMP/private-install.log" 2>&1; then
