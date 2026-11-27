@@ -19,6 +19,7 @@
   }
   async function authorized(path,options={}){const started=epoch,token=await access();const data=await raw(path,{...options,token});if(started!==epoch)throw Error('Respuesta descartada: la sesión cambió');return data;}
   async function logout(){const old=current;current=null;epoch++;onClose();if(old?.access)await raw('/auth/v1/logout?scope=local',{method:'POST',token:old.access});}
+  async function verifySession(){try{const user=await authorized('/auth/v1/user');if(!user?.email_confirmed_at||user.id!==current?.user.id)throw Object.assign(Error('La sesión ya no corresponde al titular'),{status:401});return session();}catch(error){if([401,403,404].includes(error.status)){current=null;epoch++;onClose();}throw error;}}
   const allowed=new Set(['book','catalogs','planning','reminders','preferences','notifications']);
   async function get(name){if(!allowed.has(name))throw Error('Módulo inválido');const rows=await authorized('/rest/v1/rpc/get_module_state?p_module='+encodeURIComponent(name),{headers:profile});if(!Array.isArray(rows)||rows.length>1)throw Error('Respuesta inválida');return rows[0]||null;}
   const contract=()=>authorized('/rest/v1/rpc/book_sync_contract',{headers:profile});
@@ -29,7 +30,7 @@
   async function verifyFinal(email,password){const original=session();if(!email||!password)throw Error('Introduce las credenciales definitivas para verificar el acceso');const d=accept(await raw('/auth/v1/token?grant_type=password',{method:'POST',body:{email,password}}));if(epoch!==original.epoch)throw Error('La sesión cambió');if(d.user.email.toLowerCase()!==email.toLowerCase())throw Error('Usa la cuenta definitiva reservada');if(d.user.id===current.user.id){const receipt=await releaseStatus();if(receipt.phase!=='cleaned'||receipt.final_owner!==d.user.id)throw Error('Usa la cuenta definitiva reservada');}return d.access;}
   const revokeFinal=token=>raw('/auth/v1/logout?scope=local',{method:'POST',token}).catch(()=>{});
   async function recoverPassword(fragment,password){if(!root.MF_SAFETY.strongPassword(password))throw Error('Usa al menos 12 caracteres con mayúsculas, minúsculas, números y símbolos');const params=new URLSearchParams(fragment.replace(/^#/,''));if(params.get('type')!=='recovery'||!params.get('access_token'))throw Error('El enlace de recuperación no es válido');const token=params.get('access_token');const user=await raw('/auth/v1/user',{token});if(!user?.id||!user.email_confirmed_at)throw Error('La cuenta debe estar verificada');await raw('/auth/v1/user',{method:'PUT',body:{password},token});await revokeFinal(token);}
-  return Object.freeze({session,login,logout,get,put,contract,release,releaseStatus,registerFinal,verifyFinal,revokeFinal,recoverPassword,recover:email=>raw('/auth/v1/recover',{method:'POST',body:{email}}),ensureOwner:async()=>session()});
+  return Object.freeze({session,login,logout,verifySession,get,put,contract,release,releaseStatus,registerFinal,verifyFinal,revokeFinal,recoverPassword,recover:email=>raw('/auth/v1/recover',{method:'POST',body:{email}}),ensureOwner:async()=>session()});
  }
  const api={create};root.MF_SESSION_CLIENT=api;if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

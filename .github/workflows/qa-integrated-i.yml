@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: misfinanzas-integrated-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   affected-browser:
     runs-on: ubuntu-24.04

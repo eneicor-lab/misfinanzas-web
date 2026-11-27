@@ -4,6 +4,7 @@ test('integrated financial journey and responsive shell with synthetic transport
  const errors=[];page.on('pageerror',e=>errors.push(e.message));const modules={book:{revision:1,payload:structuredClone(fresh)},catalogs:{revision:1,payload:{categories:[{id:'food',name:'Alimentación'}],people:[],bills:[]}}};const owner='11111111-1111-4111-8111-111111111111';
  await page.route('https://yjzgpspxvmimduuemxms.supabase.co/**',async route=>{const request=route.request(),u=new URL(request.url());let body;
   if(u.pathname==='/auth/v1/token')body={access_token:'synthetic-token',refresh_token:'synthetic-refresh',expires_in:3600,user:{id:owner,email:'synthetic@example.invalid',email_confirmed_at:'2026-01-01'}};
+  else if(u.pathname==='/auth/v1/user')body={id:owner,email:'synthetic@example.invalid',email_confirmed_at:'2026-01-01'};
   else if(u.pathname.endsWith('/book_sync_contract'))body={version:1,protected:true,enabled:true,authorized:true};
   else if(u.pathname.endsWith('/get_module_state')){const m=modules[u.searchParams.get('p_module')];body=m?[m]:[];}
   else if(u.pathname.endsWith('/put_module_state')){const d=request.postDataJSON(),prior=modules[d.p_module]?.revision||0;if(prior!==d.p_expected_revision)return route.fulfill({status:409,json:{message:'Synthetic revision conflict'}});body=prior+1;modules[d.p_module]={revision:body,payload:d.p_payload};}
