@@ -39,7 +39,7 @@ pg -d postgres <<'SQL' > evidence/integrated-real-db-result.txt
 DO $$ DECLARE b jsonb; BEGIN
  SELECT payload INTO STRICT b FROM mf_next.module_state WHERE module='book';
  PERFORM mf_next.validate_book(b);
- IF jsonb_array_length(b->'bank'->'events')<>5 THEN RAISE EXCEPTION 'Expected income, expense, transfer and two unique debt payments';END IF;
+ IF jsonb_array_length(b->'bank'->'events')<>8 THEN RAISE EXCEPTION 'Expected eight explicit operations including traceable opening corrections';END IF;
 END $$;
 SELECT 'PASS actual persisted book validated after desktop-to-mobile UI journey';
 SQL
