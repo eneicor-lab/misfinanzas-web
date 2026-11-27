@@ -38,8 +38,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin 0dd1e1642a2337e5bca1da89cb4008be76293ca4 fdd045a6427baadebb50c53ce9c57d09c97054db
-          git diff --exit-code 0dd1e1642a2337e5bca1da89cb4008be76293ca4 fdd045a6427baadebb50c53ce9c57d09c97054db -- web android/app/src/main android/app/build.gradle.kts package.json
+          git fetch --no-tags --depth=1 origin 0dd1e1642a2337e5bca1da89cb4008be76293ca4 10eb3780da53acb686fda75a5e965eb13793a3ff
+          git diff --exit-code 0dd1e1642a2337e5bca1da89cb4008be76293ca4 10eb3780da53acb686fda75a5e965eb13793a3ff -- web android/app/src/main android/app/build.gradle.kts package.json
           dir="$RUNNER_TEMP/mf-signed-delivery"
           mkdir -p "$dir"
           gh run download 46043307612 --repo "$GITHUB_REPOSITORY" --name signed-android-0dd1e1642a2337e5bca1da89cb4008be76293ca4 --dir "$dir"
@@ -57,6 +57,6 @@ jobs:
 
           Validaciones: 14 casos focalizados de transición, respaldo cifrado y restauración comparada de18tablas, y carga HTTPS observada en escritorio/móvil. Las pruebas funcionales y nativas anteriores se reutilizan según sus fuentes sin cambios. La aceptación autenticada del titular es distinta de esta comprobación de entrega.
 
-          APK fuente: 0dd1e1642a2337e5bca1da89cb4008be76293ca4. Fuente integrada de aplicación idéntica: fdd045a6427baadebb50c53ce9c57d09c97054db.
+          APK fuente: 0dd1e1642a2337e5bca1da89cb4008be76293ca4. Fuente integrada de aplicación idéntica: 10eb3780da53acb686fda75a5e965eb13793a3ff.
           NOTES
-          gh release create v2.7.0 MisFinanzas-2.7.0-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt --repo "$GITHUB_REPOSITORY" --target fdd045a6427baadebb50c53ce9c57d09c97054db --title 'MisFinanzas 2.7.0 — Web y Android' --notes-file RELEASE_NOTES.md
+          gh release create v2.7.0 MisFinanzas-2.7.0-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt --repo "$GITHUB_REPOSITORY" --target 10eb3780da53acb686fda75a5e965eb13793a3ff --title 'MisFinanzas 2.7.0 — Web y Android' --notes-file RELEASE_NOTES.md
