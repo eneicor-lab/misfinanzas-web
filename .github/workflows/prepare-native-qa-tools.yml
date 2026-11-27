@@ -1,0 +1,63 @@
+name: Prepare public native QA tools
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths: ['.github/workflows/prepare-native-qa-tools.yml']
+permissions:
+  contents: read
+jobs:
+  public-tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Download and verify public vendor distributions only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloads native-tools/postgres native-tools/gnupg evidence
+          curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' https://get.enterprisedb.com/postgresql/postgresql-17.12-2-windows-x64-binaries.zip -o downloads/postgres.zip
+          echo '520c8c6f19abb3b31fa83ec5e486e2f769eedd7593d94e60a7cda8a5bfb4df91  downloads/postgres.zip' | sha256sum -c -
+          curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' https://gnupg.org/ftp/gcrypt/binary/gnupg-w32-2.5.24_20260923.exe -o downloads/gnupg.exe
+          curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' https://gnupg.org/ftp/gcrypt/binary/gnupg-w32-2.5.24_20260923.exe.sig -o downloads/gnupg.exe.sig
+          curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' https://gnupg.org/signature_key.asc -o downloads/vendor-keys.asc
+          export GNUPGHOME="$RUNNER_TEMP/vendor-signature-check"
+          mkdir -m 700 "$GNUPGHOME"
+          gpg --batch --import downloads/vendor-keys.asc
+          gpg --batch --status-fd 1 --verify downloads/gnupg.exe.sig downloads/gnupg.exe > evidence/vendor-signature.status 2> evidence/vendor-signature.log
+          grep -Eq '^\[GNUPG:\] VALIDSIG (6DAA6E64A76D2840571B4902528897B826403ADA|AC8E115BF73E2D8D47FA9908E98E9B2D19C6C8BD|3B761AE4E63BF3519CE7D63BECB664CBE1332EEF|D02AE49173BDAD56E4F88223707E56D3DEF4115C|02F38DFF731FF97CB039A1DA549E695E905BA208|1493269DE61F124AA69A316E3ADF34EBDBB200A4) ' evidence/vendor-signature.status
+          sha256sum downloads/* > evidence/DOWNLOAD_SHA256SUMS.txt
+      - name: Extract portable tools without running installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile,pathlib
+          root=pathlib.Path('native-tools/postgres').resolve()
+          with zipfile.ZipFile('downloads/postgres.zip') as z:
+              for item in z.infolist():
+                  p=pathlib.PurePosixPath(item.filename)
+                  if '..' in p.parts or p.is_absolute():raise RuntimeError('Unsafe vendor archive path')
+                  low=item.filename.lower()
+                  keep=any(low.startswith('pgsql/'+x+'/') for x in ['bin','lib','share','doc'])
+                  keep=keep or any(x in p.name.lower() for x in ['license','copying','copyright'])
+                  if keep:z.extract(item,root)
+          PY
+          if command -v 7z >/dev/null; then seven=7z; else seven=7zz; fi
+          "$seven" x -y -onative-tools/gnupg downloads/gnupg.exe > evidence/extraction.log
+          test -n "$(find native-tools/postgres -name postgres.exe -print -quit)"
+          test -n "$(find native-tools/gnupg -name gpg.exe -print -quit)"
+          python3 - <<'PY'
+          import pathlib,hashlib,json
+          root=pathlib.Path('native-tools')
+          rows=[{'path':str(p.relative_to(root)).replace('\\','/'),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(root.rglob('*')) if p.is_file()]
+          (root/'TOOLS_MANIFEST.json').write_text(json.dumps({'purpose':'Public portable vendor tools; no private project scripts, credentials or data','files':rows},indent=2))
+          print('PASS verified vendor distributions and portable tool inventory: '+str(len(rows))+' files')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-native-qa-tools
+          path: |
+            native-tools/
+            evidence/
+          retention-days: 14
