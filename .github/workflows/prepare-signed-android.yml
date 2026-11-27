@@ -1,0 +1,117 @@
+name: Build signed MisFinanzas 2.7.0 stable
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths: ['.github/workflows/prepare-signed-android.yml','tools/private_drive.py','tools/qa_signed_android.py','android/app/src/main/java/co/misfinanzas/dev/MainActivity.java','web/vault-shell.js','web/supabase-dev.html','android/app/build.gradle.kts']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: misfinanzas-private-signing
+  cancel-in-progress: false
+jobs:
+  signed-apk:
+    if: github.ref == 'refs/heads/integration/misfinanzas-2.7-rc2' && !contains(github.event.head_commit.message, '[transition-wip]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Recover existing private signing identity before considering generation
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/mf-signing"
+          python tools/private_drive.py get-or-create-signing "$RUNNER_TEMP/mf-signing/identity.tar.gz.gpg" "$RUNNER_TEMP/mf-signing/receipt.json"
+          test -s "$RUNNER_TEMP/mf-signing/identity.tar.gz.gpg" || { echo "BLOCKED: existing signing identity missing; no replacement generated."; exit 1; }
+      - name: Decrypt recovered identity for this build only
+        env:
+          BACKUP_KEY: ${{ secrets.MF_BACKUP_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test "${#BACKUP_KEY}" -ge 32
+          mkdir "$RUNNER_TEMP/mf-signing/restored"
+          printf '%s' "$BACKUP_KEY" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --output "$RUNNER_TEMP/mf-signing/recovered.tar.gz" --decrypt "$RUNNER_TEMP/mf-signing/identity.tar.gz.gpg"
+          tar -xzf "$RUNNER_TEMP/mf-signing/recovered.tar.gz" -C "$RUNNER_TEMP/mf-signing/restored"
+          (cd "$RUNNER_TEMP/mf-signing/restored" && sha256sum -c CERTIFICATE_SHA256.txt)
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+          cache-read-only: false
+      - name: Reuse approved native evidence and verify affected browser QA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,urllib.request
+          url='https://api.github.com/repos/eneicor-lab/misfinanzas-web/actions/runs/46042935985'
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as response:data=json.load(response)
+          if data.get('head_sha')!='7b26e611d1e5d67e2919ea6991394b9b574cedb0' or data.get('status')!='completed' or data.get('conclusion')!='success':raise RuntimeError('Affected transition browser QA is not approved')
+          print('PASS 14 focused desktop/mobile transition cases; exact tested source verified below.')
+          PY
+          git fetch --no-tags --depth=1 origin 7b26e611d1e5d67e2919ea6991394b9b574cedb0
+          git diff --exit-code 7b26e611d1e5d67e2919ea6991394b9b574cedb0 HEAD -- web android/app/src/main
+          git fetch --no-tags --depth=1 origin ddfdda349d6e2f1501b32c9d1cbbf9f8edcfaa4d
+          git diff --exit-code ddfdda349d6e2f1501b32c9d1cbbf9f8edcfaa4d HEAD -- android/app/src/main/java android/app/src/main/res android/app/src/main/AndroidManifest.xml
+          mkdir -p artifacts
+          printf '%s\n' 'Native code and original icon unchanged; reuse signed installation/lock/update evidence 45887574532 attempt2. Affected transition resources: 14 browser cases approved in 46042935985 against identical web/Android assets. Backend productive setup remains separate.' > artifacts/FUNCTIONAL_QA_REUSED.txt
+      - name: Compile signed release without changing production or installing over an existing app
+        env:
+          MF_ANDROID_SIGNING_DIR: ${{ runner.temp }}/mf-signing/restored
+        run: |
+          set -euo pipefail
+          gradle -p android :app:assembleRelease --no-daemon --no-configuration-cache
+          node tools/check-assets.cjs
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/MisFinanzas-2.7.0-signed.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs artifacts/*.apk > artifacts/SIGNATURE.txt
+          expected=$(cut -d' ' -f1 "$RUNNER_TEMP/mf-signing/restored/CERTIFICATE_SHA256.txt")
+          grep -Fi "$expected" artifacts/SIGNATURE.txt
+          grep -Fi "08da57bab4097f2ae71f4093a14d220e44c660f456a152ee01f8d224ab73d94b" artifacts/SIGNATURE.txt
+          while IFS= read -r f; do unzip -p artifacts/*.apk "assets/${f#web/}" | cmp - "$f"; done < <(find web -type f | sort)
+          printf '%s\n' '${{ github.sha }}' > artifacts/COMMIT.txt
+          (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
+          cat artifacts/SHA256SUMS.txt
+          printf '%s\n' 'Stable signing identity recovered from encrypted owner-only Drive storage; original bank icon retained.' 'Integral 2.7.0 build with private transition client; publication and private backend activation require separate authorization.' 'Installing over historical debug APKs requires their matching signer; never uninstall or discard existing data automatically.' > artifacts/STATUS.txt
+      - name: Preserve APK and public certificate evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-android-${{ github.sha }}
+          path: artifacts/
+          retention-days: 90
+      - name: Remove ephemeral private signing material
+        if: always()
+        run: |
+          python - <<'PY'
+          import os,shutil
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP']).resolve()
+          target=(root/'mf-signing').resolve()
+          if target.parent!=root:raise RuntimeError('Unexpected signing cleanup target')
+          if target.exists():shutil.rmtree(target)
+          PY

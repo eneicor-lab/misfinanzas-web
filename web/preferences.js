@@ -1,0 +1,8 @@
+(function(root){'use strict';
+ const KEY='misfinanzas_preferences_v1';
+ function validate(v){if(!v||v.version!==1||![1,3,5].includes(v.notificationDays)||!Array.isArray(v.periods)||v.periods.length>10000)throw Error('Preferencias invalidas');const ids=new Set();for(const p of v.periods){if(!p||typeof p.id!=='string'||ids.has(p.id)||typeof p.billId!=='string'||!Number.isSafeInteger(p.estimated)||p.estimated<0||!Number.isSafeInteger(p.paid)||p.paid<0||!(p.billed===null||Number.isSafeInteger(p.billed)&&p.billed>=0)||!['pendiente','parcial','pagada','anulada'].includes(p.status))throw Error('Agenda invalida');ids.add(p.id);}return v;}
+ function alerts(v){if(!Array.isArray(v)||v.length>500||v.some(a=>!a||!['string','number'].includes(typeof a.id)||typeof a.title!=='string'||typeof a.read!=='boolean'||a.readAt!=null&&!Number.isFinite(Date.parse(a.readAt))||a.createdAt!=null&&!Number.isFinite(Date.parse(a.createdAt))))throw Error('Notificaciones invalidas');const ids=v.map(a=>String(a.id));if(new Set(ids).size!==ids.length)throw Error('Notificaciones duplicadas');return v;}
+ function load(storage){const raw=storage.getItem(KEY);if(raw!==null)return validate(JSON.parse(raw));const days=Number(storage.getItem('misfinanzas_v25_notification_days'));return validate({version:1,notificationDays:[1,3,5].includes(days)?days:3,periods:JSON.parse(storage.getItem('minorte_v18_periodos')||'[]')});}
+ function patch(storage,changes){const next=validate({...load(storage),...changes});storage.setItem(KEY,JSON.stringify(next));return next;}
+ root.MF_PREFERENCES={KEY,validate,alerts,load,patch};if(typeof module==='object'&&module.exports)module.exports=root.MF_PREFERENCES;
+})(typeof window!=='undefined'?window:globalThis);

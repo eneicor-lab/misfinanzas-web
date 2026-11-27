@@ -1,0 +1,165 @@
+name: Transfer verified public native tools
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths: ['.github/workflows/transfer-native-qa-tools.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  portable-transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: public-native-qa-tools
+          run-id: 45998225846
+          github-token: ${{ github.token }}
+          path: vendor
+      - name: Select unchanged public tools and create bounded transfer parts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir transfer
+          python3 - <<'PY'
+          import pathlib,json,hashlib,zipfile
+          root=pathlib.Path('vendor/native-tools')
+          original=json.loads((root/'TOOLS_MANIFEST.json').read_text())['files']
+          expected={x['path']:x for x in original}
+          binaries={'postgres.exe','pg_ctl.exe','initdb.exe','psql.exe','pg_dump.exe','pg_restore.exe','createdb.exe','dropdb.exe'}
+          selected=[]
+          for p in sorted(root.rglob('*')):
+              if not p.is_file():continue
+              rel=p.relative_to(root).as_posix();low=rel.lower()
+              keep=low.startswith('postgres/pgsql/share/') or low.endswith('/lib/pgcrypto.dll')
+              keep=keep or (low.startswith('postgres/pgsql/bin/') and (p.name.lower() in binaries or p.suffix.lower()=='.dll'))
+              keep=keep or low.startswith('gnupg/') or any(x in p.name.lower() for x in ['copyright','license','copying'])
+              if keep:
+                  data=p.read_bytes();old=expected.get(rel)
+                  if not old or hashlib.sha256(data).hexdigest()!=old['sha256']:raise RuntimeError('Public vendor tool integrity mismatch')
+                  selected.append((p,rel,old))
+          with zipfile.ZipFile('portable-native-tools.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p,rel,old in selected:z.write(p,rel)
+              z.writestr('PORTABLE_TOOLS_MANIFEST.json',json.dumps({'sourceRun':45998225846,'files':[{'path':rel,**{k:v for k,v in old.items() if k!='path'}} for p,rel,old in selected]},indent=2))
+              for p in pathlib.Path('vendor/evidence').glob('*'):
+                  if p.is_file():z.write(p,'verification/'+p.name)
+          data=pathlib.Path('portable-native-tools.zip').read_bytes();size=4*1024*1024
+          if len(data)>size*12:raise RuntimeError('Public tool transfer exceeds bounded package size')
+          parts=[]
+          for i,start in enumerate(range(0,len(data),size)):
+              piece=data[start:start+size];name='part'+str(i).zfill(2)
+              pathlib.Path('transfer',name).write_bytes(piece)
+              parts.append({'name':name,'bytes':len(piece),'sha256':hashlib.sha256(piece).hexdigest()})
+          pathlib.Path('transfer/TRANSFER_MANIFEST.json').write_text(json.dumps({'wholeBytes':len(data),'wholeSha256':hashlib.sha256(data).hexdigest(),'parts':parts},indent=2))
+          print('PASS reused verified public artifacts: '+str(len(selected))+' tool files; '+str(len(parts))+' bounded parts; no private procedures or data')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part00') != ''
+        with:
+          name: native-tools-part00
+          compression-level: 0
+          path: |
+            transfer/part00
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part01') != ''
+        with:
+          name: native-tools-part01
+          compression-level: 0
+          path: |
+            transfer/part01
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part02') != ''
+        with:
+          name: native-tools-part02
+          compression-level: 0
+          path: |
+            transfer/part02
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part03') != ''
+        with:
+          name: native-tools-part03
+          compression-level: 0
+          path: |
+            transfer/part03
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part04') != ''
+        with:
+          name: native-tools-part04
+          compression-level: 0
+          path: |
+            transfer/part04
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part05') != ''
+        with:
+          name: native-tools-part05
+          compression-level: 0
+          path: |
+            transfer/part05
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part06') != ''
+        with:
+          name: native-tools-part06
+          compression-level: 0
+          path: |
+            transfer/part06
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part07') != ''
+        with:
+          name: native-tools-part07
+          compression-level: 0
+          path: |
+            transfer/part07
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part08') != ''
+        with:
+          name: native-tools-part08
+          compression-level: 0
+          path: |
+            transfer/part08
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part09') != ''
+        with:
+          name: native-tools-part09
+          compression-level: 0
+          path: |
+            transfer/part09
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part10') != ''
+        with:
+          name: native-tools-part10
+          compression-level: 0
+          path: |
+            transfer/part10
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('transfer/part11') != ''
+        with:
+          name: native-tools-part11
+          compression-level: 0
+          path: |
+            transfer/part11
+            transfer/TRANSFER_MANIFEST.json
+          retention-days: 14

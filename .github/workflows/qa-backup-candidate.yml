@@ -1,0 +1,62 @@
+name: QA candidate backup
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths:
+      - '.github/workflows/qa-backup-candidate.yml'
+      - 'sql/010_backup_candidate_read_only.sql'
+      - 'sql/009b_bind_sole_verified_owner_sql_editor.sql'
+      - 'sql/011_legacy_migration_candidate.sql'
+      - 'sql/012_legacy_migration_revert_candidate.sql'
+      - 'sql/013_auth_backup_candidate.sql'
+      - 'tools/legacy-migrate.cjs'
+      - 'tests/database/migration-state.sql'
+      - 'tests/database/auth-recovery-fixture.sql'
+      - 'tests/database/run-auth-recovery-qa.sh'
+      - 'tools/restore-auth-snapshot.sql'
+      - 'tests/database/backup-*'
+      - 'tests/database/run-backup-qa.sh'
+      - 'tests/database/legacy-contract.sql'
+permissions:
+  contents: read
+concurrency:
+  group: candidate-backup-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: synthetic-qa-only
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Full-schema restricted backup and isolated restore
+        shell: bash
+        env:
+          MF_QA_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          bash tests/database/run-backup-qa.sh 2>&1 | tee backup-qa.log
+      - name: Preserve synthetic evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-backup-${{ github.sha }}
+          path: |
+            backup-qa.log
+            evidence/*.inventory
+            evidence/*.diff
+            evidence/*.txt
+            evidence/*.sha256
+            evidence/*.gpg
+            evidence/*.toc
+            evidence/schema-acl.sql
+          retention-days: 30

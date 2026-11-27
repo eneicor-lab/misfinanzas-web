@@ -1,0 +1,11 @@
+const assert=require('assert'),R=require('../web/auth-recovery.js'),S=require('../web/finance-safety.js');
+assert.deepEqual(R.readRecovery('https://example.test/app#type=recovery&access_token=synthetic-token&refresh_token=synthetic-refresh'),{token:'synthetic-token',clean:'/app'});
+assert.equal(R.readRecovery('https://example.test/app#type=signup&access_token=synthetic'),null);
+assert.throws(()=>R.connection('http://qa.supabase.co','sb_publishable_synthetic',S));
+assert.throws(()=>R.connection('https://qa.example.test','sb_publishable_synthetic',S));
+assert.throws(()=>R.connection('https://qa.supabase.co','sb_secret_synthetic',S));
+assert.equal(R.connection('https://qa.supabase.co/','sb_publishable_synthetic',S).base,'https://qa.supabase.co');
+console.log('PASS recovery callback extraction, hash removal target, unrelated flow exclusion, HTTPS/origin/public-key restrictions (6 assertions)');
+const token='e30.'+Buffer.from(JSON.stringify({iss:'https://qa.supabase.co/auth/v1'})).toString('base64url')+'.synthetic';
+assert.equal(R.tokenIssuer(token),'https://qa.supabase.co/auth/v1');assert.equal(R.tokenIssuer('invalid'),null);
+console.log('PASS issuer parsing for origin binding; authentication remains verified by provider (2 assertions)');

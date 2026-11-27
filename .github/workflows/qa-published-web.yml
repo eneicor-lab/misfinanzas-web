@@ -1,0 +1,26 @@
+name: Verify published MisFinanzas HTTPS
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['pages build and deployment']
+    types: [completed]
+permissions:
+  contents: read
+jobs:
+  https-delivery:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: node tools/qa-published-web.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: published-web-${{ github.sha }}
+          path: evidence/published-web.json
+          retention-days: 30

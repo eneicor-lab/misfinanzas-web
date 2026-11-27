@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 7 * * *'
+  push:
+    branches: [integration/misfinanzas-2.7-rc2]
+    paths: ['.github/workflows/respaldo-misfinanzas.yml']
 
 permissions:
   contents: read
@@ -15,6 +18,7 @@ concurrency:
 
 jobs:
   respaldo:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[backup-candidate-verify]')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -31,6 +35,7 @@ jobs:
           --health-retries 5
 
     steps:
+      - uses: actions/checkout@v4
 
       - name: Preparar entorno
         run: |
@@ -47,7 +52,8 @@ jobs:
           PGUSER: mf_backup.yjzgpspxvmimduuemxms
           PGDATABASE: postgres
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          PGSSLMODE: require
+          PGSSLMODE: verify-full
+          PGSSLROOTCERT: /tmp/mf-supabase-root.crt
           PGCONNECT_TIMEOUT: "15"
         run: |
           set -euo pipefail
@@ -62,6 +68,10 @@ jobs:
           from pathlib import Path
 
           cid = os.environ["CONTAINER_ID"]
+          import hashlib
+          ca=Path("sql/certs/supabase-root.crt").read_bytes()
+          if hashlib.sha256(ca).hexdigest()!="700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7":raise RuntimeError("Reviewed CA mismatch")
+          subprocess.run(["docker","cp","sql/certs/supabase-root.crt",cid+":/tmp/mf-supabase-root.crt"],check=True)
           root = Path(os.environ["RUNNER_TEMP"]) / "mf_backup"
 
           tables = [
@@ -84,6 +94,7 @@ jobs:
               "PGDATABASE",
               "PGPASSWORD",
               "PGSSLMODE",
+              "PGSSLROOTCERT",
               "PGCONNECT_TIMEOUT"
           ]
 
@@ -94,13 +105,15 @@ jobs:
 
           base += [cid]
 
+          tables = ["public."+t for t in tables] + ["mf_next.accounts","mf_next.movements","mf_next.module_state","mf_next.legacy_imports","mf_next.app_owner","mf_next.feature_flags","mf_next.release_control","mf_next.release_backups"]
+
           sql = " UNION ALL ".join(
               f"SELECT '{t}', count(*)::text, "
               f"encode(sha256(convert_to("
               f"coalesce(string_agg(to_jsonb(x)::text, "
               f"E'\\n' ORDER BY to_jsonb(x)::text COLLATE \"C\"),"
               f"''),'UTF8')),'hex') "
-              f"FROM public.{t} x"
+              f"FROM {t} x"
               for t in tables
           ) + " ORDER BY 1;"
 
@@ -153,6 +166,7 @@ jobs:
                               "pg_dump",
                               "--format=custom",
                               "--schema=public",
+                              "--schema=mf_next",
                               "--enable-row-security",
                               "--no-password",
                               "--snapshot=" + snapshot
@@ -195,7 +209,7 @@ jobs:
                       p.wait()
 
           print("OK: Snapshot consistente generado.")
-          print("OK: Huellas de diez tablas calculadas.")
+          print("OK: Huellas de dieciocho tablas calculadas.")
           PY
 
           mv "$DIR/source.dump" "$FILE"
@@ -217,7 +231,7 @@ jobs:
 
           echo "BACKUP_FILE=$FILE" >> "$GITHUB_ENV"
 
-          echo "OK: Esquema public respaldado."
+          echo "OK: Esquemas public y mf_next respaldados."
           echo "OK: Funciones financieras incluidas."
 
       - name: Cifrar respaldo
@@ -347,7 +361,7 @@ jobs:
               "appProperties": {
                   "application": "MisFinanzas",
                   "type": "encrypted-backup",
-                  "format": "schema-public-v2"
+                  "format": "financial-public-mf-next-v3"
               }
           }).encode()
 
@@ -534,19 +548,18 @@ jobs:
               t record;
           BEGIN
               FOR t IN
-                  SELECT table_name
+                  SELECT table_schema,table_name
                   FROM information_schema.columns
-                  WHERE table_schema = 'public'
+                  WHERE table_schema IN ('public','mf_next')
                     AND column_name = 'owner_id'
-                    AND left(table_name, 3) = 'mf_'
               LOOP
                   EXECUTE format(
                       'INSERT INTO auth.users(id)
                        SELECT DISTINCT owner_id
-                       FROM public.%I
+                       FROM %I.%I
                        WHERE owner_id IS NOT NULL
                        ON CONFLICT DO NOTHING',
-                      t.table_name
+                      t.table_schema,t.table_name
                   );
               END LOOP;
           END $$;
@@ -728,6 +741,8 @@ jobs:
               "mf_obligations",
               "mf_tariffs"
           }
+
+          expected={"public."+t for t in expected} | set(["mf_next.accounts","mf_next.movements","mf_next.module_state","mf_next.legacy_imports","mf_next.app_owner","mf_next.feature_flags","mf_next.release_control","mf_next.release_backups"])
 
           def read(name):
               result = {}

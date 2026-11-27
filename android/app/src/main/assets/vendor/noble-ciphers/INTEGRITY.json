@@ -1,0 +1,68 @@
+{
+  "package": "@noble/ciphers",
+  "version": "2.0.1",
+  "npm_integrity": "sha512-xHK3XHPUW8DTAobU+G0XT+/w+JLM7/8k1UFdB5xg/zTFPnFCobhftzw8wl4Lw2aq/Rvir5pxfZV5fEazmeCJ2g==",
+  "archive_sha256": "e118f3df51994c9fffb41bc2b2a141a88eb635728a09a7c7cdbbe1c24a4f2d69",
+  "files": [
+    {
+      "path": "LICENSE",
+      "bytes": 1161,
+      "sha256": "f36671a5487c9c5050efacb58011c37c24c55a889803cb036cf9d9a6347c1e2d"
+    },
+    {
+      "path": "_arx.js",
+      "bytes": 9728,
+      "sha256": "2fc64a1d8379549ab64a9dabdd18032175df71fb638da643dc060bbf339c12f4"
+    },
+    {
+      "path": "_poly1305.js",
+      "bytes": 12035,
+      "sha256": "1a01e558e8cbd5bcff144416c05fe1b870d12535185aa35dda7d287f1da036f1"
+    },
+    {
+      "path": "_polyval.js",
+      "bytes": 7922,
+      "sha256": "fb896835f0a11781334b9d36a9060ca18b81e1e089c9a43b7bebfd0a96a9561f"
+    },
+    {
+      "path": "aes.js",
+      "bytes": 40595,
+      "sha256": "8c530c5082149064487a0df2ea0b41b043073c6a7f382a86fd3aaebcdf130f45"
+    },
+    {
+      "path": "chacha.js",
+      "bytes": 14213,
+      "sha256": "66d7c7d6dd9187a96f52aa2054534bac02a076b2e6e397e8e8fa8f2c17b74870"
+    },
+    {
+      "path": "ff1.js",
+      "bytes": 6172,
+      "sha256": "5d3f46183492fe3db44c686c204a2aa30bfcddd74f43c0c66b34016a862c6c35"
+    },
+    {
+      "path": "index.js",
+      "bytes": 1099,
+      "sha256": "a4c52fa2b34866bf0decf86cd46d5ca548df77f61e8b376d5be0a2398f119e4f"
+    },
+    {
+      "path": "package.json",
+      "bytes": 2169,
+      "sha256": "645ee93fd68802db733d3f34501a33e00e857901e85deaae2a4c2d33138474ef"
+    },
+    {
+      "path": "salsa.js",
+      "bytes": 11271,
+      "sha256": "92047695b213b80bbed1f19c4a31172fb090c9597a13ec2756cfde6e5141cc0e"
+    },
+    {
+      "path": "utils.js",
+      "bytes": 13458,
+      "sha256": "e6b93ca8d3f07568c3f1eceb1c6cb6b0ba7bbce0641958116c7b0d115ff0fa34"
+    },
+    {
+      "path": "webcrypto.js",
+      "bytes": 3917,
+      "sha256": "228ec2505c56b35cc3ac2adb37736bc27a14672d3eaaf109257967e10a181edf"
+    }
+  ]
+}
