@@ -8,7 +8,7 @@ function lock(message='Aplicación bloqueada. Tus datos locales permanecen cifra
  try{const bridge=frame?.contentWindow?.document.getElementById('mfdev-frame')?.contentWindow?.MF_BOOK_SESSION;if(bridge?.logout)void bridge.logout({lockPrivate:false});}catch{}
  clearTimeout(idle);vault.lock();window.MF_APP_READY=false;if(frame){frame.remove();frame=null;}panel.hidden=false;toolbar.hidden=true;status.textContent=message;password.value=confirmation.value='';configure();
 }
-window.MF_PRIVATE_LOCK=()=>lock();
+window.MF_PRIVATE_LOCK=message=>lock(typeof message==='string'?message:undefined);
 form.addEventListener('submit',async event=>{event.preventDefault();const open=document.getElementById('vaultOpen');open.disabled=true;status.textContent='Abriendo tu información privada…';
  try{const create=!vault.exists;if(create&&password.value!==confirmation.value)throw Error('Las claves no coinciden');await vault.unlock(password.value,{create});password.value=confirmation.value='';frame=document.createElement('iframe');frame.id='mfPrivateApp';frame.title='MisFinanzas — información privada';frame.src='./app.html';frame.addEventListener('load',()=>{if(!vault.unlocked||!frame)return;try{const app=frame.contentWindow;window.MF_APP_READY=!!(app.MF_APP_STORE&&app.MF_APP_ENGINE.check(app.MF_APP_STORE.read().state));for(const event of ['pointerdown','keydown','input','wheel'])app.addEventListener(event,resetIdle,{passive:true});if(!window.MF_APP_READY)throw Error('No se confirmó la apertura de la aplicación');}catch(error){lock('No fue posible abrir la aplicación: '+error.message);}});document.body.append(frame);panel.hidden=true;toolbar.hidden=false;resetIdle();
  }catch(error){lock(error.message);}finally{password.value=confirmation.value='';open.disabled=false;}
