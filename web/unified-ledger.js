@@ -25,7 +25,7 @@
    return s;
   }
   function replaceBank(s,bank){check(s);if(s.bank.events.some((e,i)=>!bank.events[i]||!S.sameRequest(e,bank.events[i])))fail('No se puede reemplazar el historial del libro');return check(align({...clone(s),bank:clone(bank)}))}
-  function postBank(s,p){check(s);const r=B.post(s.bank,p);return {state:check(align({...clone(s),bank:r.state})),duplicate:!r.posted}}
+  function postBank(s,p){check(s);const r=B.post(s.bank,p);if(!r.posted)return {state:clone(s),duplicate:true};return {state:check(align({...clone(s),bank:r.state})),duplicate:false}}
   function adjustOpening(s,p){check(s);const account=s.bank.accounts[p.accountId];if(!account||!money(p.target)||typeof p.reason!=='string'||p.reason.trim().length<15||p.reason.length>100)fail('Revisa cuenta, saldo y motivo detallado de la corrección');
    const prior=s.bank.events.find(e=>e.id===p.id||e.key===p.key);if(prior){if(prior.financialClass!=='opening_adjustment'||prior.openingTarget!==p.target||prior.adjustedAccount!==p.accountId||prior.concept!==p.reason||prior.date!==p.date)fail('Conflicto de idempotencia en la corrección');return {state:clone(s),duplicate:true};}
    const effective=account.opening+S.sum((s.bank.openingAdjustments||[]).filter(a=>a.accountId===p.accountId).map(a=>a.delta))+S.sum(s.bank.events.filter(e=>e.financialClass==='opening_adjustment'&&e.adjustedAccount===p.accountId).map(e=>e.type==='income'?e.amount:-e.amount));
