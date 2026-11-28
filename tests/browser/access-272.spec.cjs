@@ -5,9 +5,11 @@ test('current password opens previously encrypted devices after real Auth passwo
  async function login(p,pw){await p.getByLabel('Correo',{exact:true}).fill(email);await p.getByLabel('Contraseña',{exact:true}).fill(pw);await p.getByRole('button',{name:'Iniciar sesión',exact:true}).click();}
  await route(page);await page.goto('/');await login(page,old);await expect(page.locator('#application')).toBeVisible();await expect(page.locator('#loginForm input')).toHaveCount(2);
  await page.getByRole('button',{name:'Cuentas',exact:true}).click();await page.getByRole('button',{name:'Nueva cuenta',exact:true}).click();await page.getByLabel('Nombre',{exact:true}).fill('Saldo recuperable');await page.getByLabel('Saldo inicial COP').fill('125000');await page.getByRole('button',{name:'Guardar',exact:true}).click();await expect(page.locator('#connection')).toContainText('sincronizada');
+ await page.locator('#userIdentity').click();await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await expect(page.locator('#access')).toBeVisible();
  const before=await page.evaluate(()=>localStorage.getItem('mf_private_vault_v1'));
  // A second real device has an old encrypted copy before the administrator resets the same UID.
  const mobileContext=await browser.newContext({viewport:{width:412,height:915}}),mobile=await mobileContext.newPage();await route(mobile);await mobile.goto('/');await login(mobile,old);await expect(mobile.locator('#application')).toBeVisible();
+ await mobile.locator('#userIdentity').click();await mobile.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await expect(mobile.locator('#access')).toBeVisible();
  const mobileBefore=await mobile.evaluate(()=>localStorage.getItem('mf_private_vault_v1'));
  const response=await page.request.post('http://127.0.0.1:9999/token?grant_type=password',{data:{email,password:old}});const prior=await response.json();
  const changed=await page.request.put('http://127.0.0.1:9999/user',{headers:{Authorization:'Bearer '+prior.access_token},data:{password}});expect(changed.ok()).toBe(true);expect((await changed.json()).id).toBe(prior.user.id);
