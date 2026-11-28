@@ -1,0 +1,201 @@
+name: MisFinanzas 2.7.2 current credential correction
+on:
+  push:
+    branches: [integration/misfinanzas-2.7.2]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: misfinanzas-access-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  affected-browser:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/vault-remote-recovery-i.test.cjs
+      - run: node tests/current-access-272.test.cjs
+      - run: node tools/check-assets.cjs
+  real-auth-finance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: synthetic-auth-db-only
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.34.0
+        ports: ['1025:1025','8025:8025']
+    env:
+      PGPASSWORD: synthetic-auth-db-only
+      PGHOST: localhost
+      PGUSER: postgres
+      PGDATABASE: postgres
+      GOTRUE_DB_DRIVER: postgres
+      DATABASE_URL: postgres://postgres:synthetic-auth-db-only@localhost:5432/postgres
+      DB_NAMESPACE: auth
+      GOTRUE_DB_MIGRATIONS_PATH: ${{ github.workspace }}/.qa/auth-source/migrations
+      GOTRUE_API_HOST: 127.0.0.1
+      GOTRUE_API_PORT: '9999'
+      PORT: '9999'
+      API_EXTERNAL_URL: http://127.0.0.1:9999
+      GOTRUE_SITE_URL: http://127.0.0.1:8765
+      GOTRUE_URI_ALLOW_LIST: http://127.0.0.1:8765/**,https://eneicor-lab.github.io/misfinanzas-web/web/index.html
+      GOTRUE_JWT_SECRET: synthetic-auth-service-secret-not-for-production-1234567890
+      GOTRUE_JWT_EXP: '3600'
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
+      GOTRUE_MAILER_AUTOCONFIRM: 'false'
+      GOTRUE_SMTP_HOST: localhost
+      GOTRUE_SMTP_PORT: '1025'
+      GOTRUE_SMTP_ADMIN_EMAIL: noreply@example.invalid
+      GOTRUE_SMTP_SENDER_NAME: MisFinanzas QA
+      GOTRUE_SMTP_MAX_FREQUENCY: 1s
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: '1000'
+      GOTRUE_PASSWORD_MIN_LENGTH: '12'
+      GOTRUE_PASSWORD_REQUIRED_CHARACTERS: 'abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789:!@#$%^&*()_+-=[]{};,.?/'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: supabase/auth
+          ref: 0725a1d90cd9fbbb2a26f3baf18afd400a436f66
+          path: .qa/auth-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Exercise integrated UI with real isolated services
+        env:
+          MF_QA_CONTAINER: ${{ job.services.postgres.id }}
+          MF_PRIVATE_RELEASE_QA: ${{ secrets.MF_PRIVATE_RELEASE_QA }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mf-auth /tmp/mf-postgrest evidence
+          curl --fail --location --silent --show-error https://github.com/supabase/auth/releases/download/v2.199.0/auth-v2.199.0-amd64.tar.xz -o /tmp/mf-auth/auth.tar.xz
+          echo '056ed85d91c2077746fbf639e19ffdd557460c561139dada217f9560606d6852  /tmp/mf-auth/auth.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/mf-auth/auth.tar.xz -C /tmp/mf-auth
+          curl --fail --location --silent --show-error https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz -o /tmp/mf-postgrest/postgrest.tar.xz
+          tar -xJf /tmp/mf-postgrest/postgrest.tar.xz -C /tmp/mf-postgrest
+          bash tests/database/run-access-272.sh 2>&1 | tee evidence/integrated-real-ui.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integrated-real-services-${{ github.sha }}
+          path: |
+            evidence/
+            test-results/
+
+  signed-apk:
+    needs: [affected-browser, real-auth-finance]
+    if: contains(github.event.head_commit.message, '[deliver-apk]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Recover existing private signing identity before considering generation
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/mf-signing"
+          python tools/private_drive.py get-or-create-signing "$RUNNER_TEMP/mf-signing/identity.tar.gz.gpg" "$RUNNER_TEMP/mf-signing/receipt.json"
+          test -s "$RUNNER_TEMP/mf-signing/identity.tar.gz.gpg" || { echo "BLOCKED: existing signing identity missing; no replacement generated."; exit 1; }
+      - name: Decrypt recovered identity for this build only
+        env:
+          BACKUP_KEY: ${{ secrets.MF_BACKUP_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test "${#BACKUP_KEY}" -ge 32
+          mkdir "$RUNNER_TEMP/mf-signing/restored"
+          printf '%s' "$BACKUP_KEY" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --output "$RUNNER_TEMP/mf-signing/recovered.tar.gz" --decrypt "$RUNNER_TEMP/mf-signing/identity.tar.gz.gpg"
+          tar -xzf "$RUNNER_TEMP/mf-signing/recovered.tar.gz" -C "$RUNNER_TEMP/mf-signing/restored"
+          (cd "$RUNNER_TEMP/mf-signing/restored" && sha256sum -c CERTIFICATE_SHA256.txt)
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+          cache-read-only: false
+      - name: Compile signed release without changing production or installing over an existing app
+        env:
+          MF_ANDROID_SIGNING_DIR: ${{ runner.temp }}/mf-signing/restored
+        run: |
+          set -euo pipefail
+          gradle -p android :app:assembleRelease --no-daemon --no-configuration-cache
+          node tools/check-assets.cjs
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/MisFinanzas-2.7.2-signed.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs artifacts/*.apk > artifacts/SIGNATURE.txt
+          expected=$(cut -d' ' -f1 "$RUNNER_TEMP/mf-signing/restored/CERTIFICATE_SHA256.txt")
+          grep -Fi "$expected" artifacts/SIGNATURE.txt
+          grep -Fi "08da57bab4097f2ae71f4093a14d220e44c660f456a152ee01f8d224ab73d94b" artifacts/SIGNATURE.txt
+          while IFS= read -r f; do unzip -p artifacts/*.apk "assets/${f#web/}" | cmp - "$f"; done < <(find web -type f | sort)
+          printf '%s\n' '${{ github.sha }}' > artifacts/COMMIT.txt
+          (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
+          cat artifacts/SHA256SUMS.txt
+          printf '%s\n' 'Stable signing identity recovered from encrypted owner-only Drive storage; original bank icon retained.' 'Integral 2.7.2 build with private transition client; publication and private backend activation require separate authorization.' 'Installing over historical debug APKs requires their matching signer; never uninstall or discard existing data automatically.' > artifacts/STATUS.txt
+      - name: Enable emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and start the new signed APK in Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          script: python tools/qa-integrated-android-i.py
+      - name: Preserve APK and public certificate evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-android-${{ github.sha }}
+          path: artifacts/
+          retention-days: 90
+      - name: Remove ephemeral private signing material
+        if: always()
+        run: |
+          python - <<'PY'
+          import os,shutil
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP']).resolve()
+          target=(root/'mf-signing').resolve()
+          if target.parent!=root:raise RuntimeError('Unexpected signing cleanup target')
+          if target.exists():shutil.rmtree(target)
+          PY
+
+
+# Focused access regression and existing-signature APK only.

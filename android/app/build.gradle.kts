@@ -2,7 +2,7 @@ plugins { id("com.android.application") }
 android {
  namespace = "co.misfinanzas.dev"
  compileSdk = 35
- defaultConfig { applicationId = "co.misfinanzas.dev"; minSdk = 26; targetSdk = 35; versionCode = 30; versionName = "2.7.1" }
+ defaultConfig { applicationId = "co.misfinanzas.dev"; minSdk = 26; targetSdk = 35; versionCode = 31; versionName = "2.7.2" }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  val signingDirectory = System.getenv("MF_ANDROID_SIGNING_DIR")
  if (!signingDirectory.isNullOrBlank()) {

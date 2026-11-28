@@ -39,38 +39,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api repos/$GITHUB_REPOSITORY/actions/jobs/140791362563 --jq .conclusion)" = success
-          git fetch --no-tags --depth=1 origin b7c636d7bcb1ce55c57e401a27bb2327d8f20e00
-          git diff --exit-code b7c636d7bcb1ce55c57e401a27bb2327d8f20e00 HEAD -- web android/app/src/main android/app/build.gradle.kts package.json
+          test "$(gh api repos/$GITHUB_REPOSITORY/actions/jobs/141005636424 --jq .conclusion)" = success
+          git fetch --no-tags --depth=1 origin 0b2435bb57c891b2f239e2f5a173d1774c9c9cae
+          git diff --exit-code 0b2435bb57c891b2f239e2f5a173d1774c9c9cae HEAD -- web android/app/src/main android/app/build.gradle.kts package.json
           dir="$RUNNER_TEMP/mf-signed-delivery"
           mkdir -p "$dir"
-          gh run download 46084541514 --repo "$GITHUB_REPOSITORY" --name signed-android-b7c636d7bcb1ce55c57e401a27bb2327d8f20e00 --dir "$dir"
+          gh run download 46153573789 --repo "$GITHUB_REPOSITORY" --name signed-android-0b2435bb57c891b2f239e2f5a173d1774c9c9cae --dir "$dir"
           cd "$dir"
-          printf '%s\n' 'bd95512c42cbe8a35ddff2c482d879ef34369211ef2366ae9cbb7f78b6e5ee3d  MisFinanzas-2.7.1-signed.apk' | sha256sum -c -
-          test "$(tr -d '\r\n' < COMMIT.txt)" = 'b7c636d7bcb1ce55c57e401a27bb2327d8f20e00'
+          printf '%s\n' '700df9848b9c38e5f392a8bb563d79dd3f1a33a1f7d4fee193140e65015a8e10  MisFinanzas-2.7.2-signed.apk' | sha256sum -c -
+          test "$(tr -d '\r\n' < COMMIT.txt)" = '0b2435bb57c891b2f239e2f5a173d1774c9c9cae'
           test -s ANDROID_ENTRY_QA.txt
           grep -Fi '08da57bab4097f2ae71f4093a14d220e44c660f456a152ee01f8d224ab73d94b' SIGNATURE.txt
           cat > RELEASE_NOTES.md <<'NOTES'
-          MisFinanzas 2.7.1 — aplicación integrada para aceptación del titular.
+          MisFinanzas 2.7.2 — aplicación integrada para aceptación del titular.
 
           Web: https://eneicor-lab.github.io/misfinanzas-web/
 
-          Acceso, navegación y libro financiero compartidos. APK nueva, código30, con el firmante y el ícono originales. Publicación verificada por HTTPS y comparación de recursos.
+          Corrección de acceso después de cambiar la contraseña: únicamente correo y contraseña vigente. La copia cifrada anterior se conserva aislada; se recupera el libro compartido validado antes de reemplazar la copia operativa. Recuperación por correo con callback publicado. APK nueva, código31, con el firmante y el ícono originales. Publicación verificada por HTTPS y comparación de recursos.
 
           Recorridos financieros y transición con Auth/PostgreSQL/PostgREST reales aislados; diseño en seis resoluciones. Instalación y acceso central comprobados en emulador Android. No se afirma una prueba física ni una sesión financiera Android contra datos reales.
 
           Lanzar definitiva solo se ejecuta por decisión y confirmación del titular. Publicar e instalar no elimina datos ni usuarios.
 
-          Fuente del APK: b7c636d7bcb1ce55c57e401a27bb2327d8f20e00
-          SHA-256: bd95512c42cbe8a35ddff2c482d879ef34369211ef2366ae9cbb7f78b6e5ee3d
+          Fuente del APK: 0b2435bb57c891b2f239e2f5a173d1774c9c9cae
+          SHA-256: 700df9848b9c38e5f392a8bb563d79dd3f1a33a1f7d4fee193140e65015a8e10
           NOTES
-          if gh release view v2.7.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh release view v2.7.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             mkdir existing
-            gh release download v2.7.1 --repo "$GITHUB_REPOSITORY" --pattern MisFinanzas-2.7.1-signed.apk --dir existing
-            cmp MisFinanzas-2.7.1-signed.apk existing/MisFinanzas-2.7.1-signed.apk
+            gh release download v2.7.2 --repo "$GITHUB_REPOSITORY" --pattern MisFinanzas-2.7.2-signed.apk --dir existing
+            cmp MisFinanzas-2.7.2-signed.apk existing/MisFinanzas-2.7.2-signed.apk
           else
-            gh release create v2.7.1 MisFinanzas-2.7.1-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt ANDROID_ENTRY_QA.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'MisFinanzas 2.7.1 — Web y Android' --notes-file RELEASE_NOTES.md
+            gh release create v2.7.2 MisFinanzas-2.7.2-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt ANDROID_ENTRY_QA.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'MisFinanzas 2.7.2 — Web y Android' --notes-file RELEASE_NOTES.md
             mkdir downloaded
-            gh release download v2.7.1 --repo "$GITHUB_REPOSITORY" --pattern MisFinanzas-2.7.1-signed.apk --dir downloaded
-            cmp MisFinanzas-2.7.1-signed.apk downloaded/MisFinanzas-2.7.1-signed.apk
+            gh release download v2.7.2 --repo "$GITHUB_REPOSITORY" --pattern MisFinanzas-2.7.2-signed.apk --dir downloaded
+            cmp MisFinanzas-2.7.2-signed.apk downloaded/MisFinanzas-2.7.2-signed.apk
           fi

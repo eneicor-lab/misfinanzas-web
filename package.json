@@ -1,6 +1,6 @@
 {
   "name": "misfinanzas-rc2-qa",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "private": true,
   "scripts": {
     "test": "node tests/run-integral.cjs && node tests/schedule-engine.test.cjs && node tests/http-smoke.cjs && node tests/planning.test.cjs && node tests/module-sync.test.cjs && node tests/auth-policy.test.cjs && node tests/auth-recovery.test.cjs && node tests/unified-ledger.test.cjs && node tests/book-sync.test.cjs",

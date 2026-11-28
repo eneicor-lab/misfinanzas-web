@@ -31,8 +31,8 @@ export class Vault{
   if(this.#native.getItem(KEY)!==expected)throw Error('La bóveda cambió: conserva ambas versiones antes de continuar');
   this.#native.setItem(KEY,encoded);if(this.#native.getItem(KEY)!==encoded)throw Error('No se confirmó la escritura cifrada');this.#meta={...meta};
  }
- async unlock(passphrase,{create=false}={}){
-  if(this.unlocked)throw Error('La bóveda ya está abierta');if(!strongPassphrase(passphrase))throw Error('Usa al menos 12 caracteres con mayúsculas, minúsculas, números y símbolos');
+ async unlock(passphrase,{create=false,authenticated=false}={}){
+  if(this.unlocked)throw Error('La bóveda ya está abierta');if(!(authenticated?typeof passphrase==='string'&&passphrase.length>0&&passphrase.length<=1024:strongPassphrase(passphrase)))throw Error('Se requiere una contraseña válida');
   const epoch=++this.#epoch;await this.#lease();try{
    if(epoch!==this.#epoch)throw Error('El acceso se canceló al bloquear la aplicación');
    const raw=this.#native.getItem(KEY);if(raw===null&&!create)throw Error('Primero protege la información de este dispositivo');if(raw!==null&&create)throw Error('La bóveda existe; no se sobrescribirá');
@@ -44,15 +44,15 @@ export class Vault{
    if(raw===null||legacy.length)this.#write(data,meta,raw);
    for(const k of legacy){this.#native.removeItem(k);if(this.#native.getItem(k)!==null)throw Error('No se retiró la copia local sin cifrar; el respaldo cifrado está conservado');}
    return true;
-  }catch(error){this.lock();throw Error(/tag|decrypt/i.test(error.message)?'La clave no coincide o la copia fue alterada':error.message);}
+  }catch(error){this.lock();const mismatch=/tag|decrypt/i.test(error.message);const failure=Error(mismatch?'La copia cifrada requiere recuperación con la sesión actual':error.message);if(mismatch)failure.code='VAULT_KEY_MISMATCH';throw failure;}
  }
- async recoverRemote(owner,passphrase,{confirmed=false,receipt=null}={}){
-  if(!confirmed||this.unlocked||!strongPassphrase(passphrase)||typeof owner!=='string')throw Error('Confirma la recuperación con la cuenta verificada y su contraseña segura');
+ async recoverRemote(owner,passphrase,{confirmed=false,receipt=null,authenticated=false}={}){
+  if(!confirmed||this.unlocked||!(authenticated?typeof passphrase==='string'&&passphrase.length>0&&passphrase.length<=1024:strongPassphrase(passphrase))||typeof owner!=='string')throw Error('Confirma la recuperación con la cuenta verificada y su contraseña segura');
   const epoch=++this.#epoch;await this.#lease();try{
    const original=this.#native.getItem(KEY);if(!original)throw Error('No hay copia local anterior para conservar');const prior=JSON.parse(original);
    if(prior.format!==1||prior.kdf!=='PBKDF2-SHA256'||prior.iterations!==KDF_ITERATIONS)throw Error('Formato de copia local no compatible');
    const ownerHash=b64(new Uint8Array(await this.#crypto.subtle.digest('SHA-256',encoder.encode(owner))));
-   if(prior.owner&&prior.owner!==ownerHash){const uid=owner.slice(owner.lastIndexOf(':')+1),prefix=owner.slice(0,owner.lastIndexOf(':')+1);const oldHash=receipt?.test_owner?b64(new Uint8Array(await this.#crypto.subtle.digest('SHA-256',encoder.encode(prefix+receipt.test_owner)))):null;if(receipt?.phase!=='completed'||receipt.test_mode!==false||receipt.final_owner!==uid||receipt.test_owner===uid||oldHash!==prior.owner||!/^[a-f0-9]{64}$/.test(receipt.manifest_sha||'')||!/^[a-f0-9]{64}$/.test(receipt.backup_cipher_sha||''))throw Error('La copia anterior pertenece a otra identidad; no se reemplazará');}
+   if(prior.owner&&prior.owner!==ownerHash){const uid=owner.slice(owner.lastIndexOf(':')+1),prefix=owner.slice(0,owner.lastIndexOf(':')+1);const oldHash=receipt?.test_owner?b64(new Uint8Array(await this.#crypto.subtle.digest('SHA-256',encoder.encode(prefix+receipt.test_owner)))):null;if(!['cleaned','completed'].includes(receipt?.phase)||(receipt.phase==='completed'&&receipt.test_mode!==false)||receipt.final_owner!==uid||receipt.test_owner===uid||oldHash!==prior.owner||!/^[a-f0-9]{64}$/.test(receipt.manifest_sha||'')||!/^[a-f0-9]{64}$/.test(receipt.backup_cipher_sha||''))throw Error('La copia anterior pertenece a otra identidad; no se reemplazará');}
    for(let i=0;i<this.#native.length;i++)if(protectedKey(this.#native.key(i)))throw Error('Hay información local sin clasificar; conserva ambas versiones antes de recuperar');
    const archive='__mf_vault_before_remote_recovery_'+this.#crypto.randomUUID();this.#native.setItem(archive,original);if(this.#native.getItem(archive)!==original)throw Error('No se confirmó la copia cifrada anterior');
    const salt=this.#crypto.getRandomValues(new Uint8Array(16)),input=encoder.encode(passphrase);let material;try{material=await this.#crypto.subtle.importKey('raw',input,'PBKDF2',false,['deriveBits']);}finally{input.fill(0);}
