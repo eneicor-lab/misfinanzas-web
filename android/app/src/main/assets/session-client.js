@@ -4,6 +4,7 @@
   if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base))throw Error('Configuración de conexión inválida');
   if(!root.MF_SAFETY.publicKey(key))throw Error('La configuración requiere una clave pública');
   let current=null,epoch=0,refreshing=null;
+  const recoveryRedirect=()=>'https://eneicor-lab.github.io/misfinanzas-web/web/index.html';
   const profile={'Accept-Profile':'mf_next','Content-Profile':'mf_next'};
   function session(){if(!current)throw Error('Inicia sesión');return {owner:base+':'+current.user.id,epoch,user:{id:current.user.id,email:current.user.email}};}
   async function raw(path,{method='GET',body,token,headers={}}={}){
@@ -30,7 +31,7 @@
   async function verifyFinal(email,password){const original=session();if(!email||!password)throw Error('Introduce las credenciales definitivas para verificar el acceso');const d=accept(await raw('/auth/v1/token?grant_type=password',{method:'POST',body:{email,password}}));if(epoch!==original.epoch)throw Error('La sesión cambió');if(d.user.email.toLowerCase()!==email.toLowerCase())throw Error('Usa la cuenta definitiva reservada');if(d.user.id===current.user.id){const receipt=await releaseStatus();if(receipt.phase!=='cleaned'||receipt.final_owner!==d.user.id)throw Error('Usa la cuenta definitiva reservada');}return d.access;}
   const revokeFinal=token=>raw('/auth/v1/logout?scope=local',{method:'POST',token}).catch(()=>{});
   async function recoverPassword(fragment,password){if(!root.MF_SAFETY.strongPassword(password))throw Error('Usa al menos 12 caracteres con mayúsculas, minúsculas, números y símbolos');const params=new URLSearchParams(fragment.replace(/^#/,''));if(params.get('type')!=='recovery'||!params.get('access_token'))throw Error('El enlace de recuperación no es válido');const token=params.get('access_token');const user=await raw('/auth/v1/user',{token});if(!user?.id||!user.email_confirmed_at)throw Error('La cuenta debe estar verificada');await raw('/auth/v1/user',{method:'PUT',body:{password},token});await revokeFinal(token);}
-  return Object.freeze({session,login,logout,verifySession,get,put,contract,release,releaseStatus,registerFinal,verifyFinal,revokeFinal,recoverPassword,recover:email=>raw('/auth/v1/recover',{method:'POST',body:{email}}),ensureOwner:async()=>session()});
+  return Object.freeze({session,login,logout,verifySession,get,put,contract,release,releaseStatus,registerFinal,verifyFinal,revokeFinal,recoverPassword,recover:email=>raw('/auth/v1/recover?redirect_to='+encodeURIComponent(recoveryRedirect()),{method:'POST',body:{email}}),ensureOwner:async()=>session()});
  }
  const api={create};root.MF_SESSION_CLIENT=api;if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
