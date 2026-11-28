@@ -46,6 +46,33 @@ export class Vault{
    return true;
   }catch(error){this.lock();throw Error(/tag|decrypt/i.test(error.message)?'La clave no coincide o la copia fue alterada':error.message);}
  }
+ async recoverRemote(owner,passphrase,{confirmed=false,receipt=null}={}){
+  if(!confirmed||this.unlocked||!strongPassphrase(passphrase)||typeof owner!=='string')throw Error('Confirma la recuperación con la cuenta verificada y su contraseña segura');
+  const epoch=++this.#epoch;await this.#lease();try{
+   const original=this.#native.getItem(KEY);if(!original)throw Error('No hay copia local anterior para conservar');const prior=JSON.parse(original);
+   if(prior.format!==1||prior.kdf!=='PBKDF2-SHA256'||prior.iterations!==KDF_ITERATIONS)throw Error('Formato de copia local no compatible');
+   const ownerHash=b64(new Uint8Array(await this.#crypto.subtle.digest('SHA-256',encoder.encode(owner))));
+   if(prior.owner&&prior.owner!==ownerHash){const uid=owner.slice(owner.lastIndexOf(':')+1),prefix=owner.slice(0,owner.lastIndexOf(':')+1);const oldHash=receipt?.test_owner?b64(new Uint8Array(await this.#crypto.subtle.digest('SHA-256',encoder.encode(prefix+receipt.test_owner)))):null;if(receipt?.phase!=='completed'||receipt.test_mode!==false||receipt.final_owner!==uid||receipt.test_owner===uid||oldHash!==prior.owner||!/^[a-f0-9]{64}$/.test(receipt.manifest_sha||'')||!/^[a-f0-9]{64}$/.test(receipt.backup_cipher_sha||''))throw Error('La copia anterior pertenece a otra identidad; no se reemplazará');}
+   for(let i=0;i<this.#native.length;i++)if(protectedKey(this.#native.key(i)))throw Error('Hay información local sin clasificar; conserva ambas versiones antes de recuperar');
+   const archive='__mf_vault_before_remote_recovery_'+this.#crypto.randomUUID();this.#native.setItem(archive,original);if(this.#native.getItem(archive)!==original)throw Error('No se confirmó la copia cifrada anterior');
+   const salt=this.#crypto.getRandomValues(new Uint8Array(16)),input=encoder.encode(passphrase);let material;try{material=await this.#crypto.subtle.importKey('raw',input,'PBKDF2',false,['deriveBits']);}finally{input.fill(0);}
+   const derived=new Uint8Array(await this.#crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:KDF_ITERATIONS,hash:'SHA-256'},material,256));if(epoch!==this.#epoch){derived.fill(0);throw Error('La recuperación se canceló');}this.#key=derived;this.#meta={format:1,kdf:'PBKDF2-SHA256',iterations:KDF_ITERATIONS,salt:b64(salt),owner:ownerHash};
+   const values={};if(receipt?.phase==='completed'&&receipt.job_id)values.mf_release_recovery_pending=String(receipt.job_id);this.#write({format:1,revision:1,values},this.#meta,original);return {archive};
+  }catch(error){this.lock();throw error;}
+ }
+ async changePassphrase(passphrase){
+  this.#opened();if(!strongPassphrase(passphrase))throw Error('La nueva clave local no cumple los requisitos');
+  const epoch=this.#epoch,current=this.#read(),salt=this.#crypto.getRandomValues(new Uint8Array(16));
+  const input=encoder.encode(passphrase);let material;try{material=await this.#crypto.subtle.importKey('raw',input,'PBKDF2',false,['deriveBits']);}finally{input.fill(0);}
+  const next=new Uint8Array(await this.#crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:KDF_ITERATIONS,hash:'SHA-256'},material,256));
+  if(epoch!==this.#epoch||!this.unlocked){next.fill(0);throw Error('El cambio se canceló al bloquear la aplicación');}
+  if(this.#read().raw!==current.raw){next.fill(0);throw Error('La copia local cambió; reintenta sin perder los cambios');}
+  const archive='__mf_vault_before_rekey_'+this.#crypto.randomUUID();
+  try{this.#native.setItem(archive,current.raw);if(this.#native.getItem(archive)!==current.raw)throw Error('No se confirmó la copia previa');}catch(error){next.fill(0);throw error;}
+  const oldKey=this.#key,oldMeta=this.#meta;this.#key=next;const meta={...current.meta,salt:b64(salt)};
+  try{current.data.revision++;this.#write(current.data,meta,current.raw);oldKey.fill(0);return {archive};}
+  catch(error){this.#key=oldKey;this.#meta=oldMeta;next.fill(0);throw error;}
+ }
  lock(){this.#epoch++;if(this.#key)this.#key.fill(0);this.#key=null;this.#meta=null;if(this.#release)this.#release();this.#release=null;}
  keys(){const {data}=this.#read();const keys=Object.keys(data.values);for(let i=0;i<this.#native.length;i++){const k=this.#native.key(i);if(k!==KEY&&!protectedKey(k))keys.push(k);}return keys;}
  get(k){this.#opened();if(k===KEY)throw Error('La copia cifrada se exporta desde la pantalla de acceso');if(!protectedKey(k))return this.#native.getItem(k);const {data}=this.#read();if(this.#native.getItem(k)!==null)throw Error('Otra versión está escribiendo sin cifrar; cierra esa pestaña y conserva el respaldo');return data.values[k]??null;}

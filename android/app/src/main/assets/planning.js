@@ -24,7 +24,7 @@
  function release(s,id){validate(s);if(!s.reservations.some(r=>r.id===id))fail('Reserva no encontrada');const n=copy(s);n.reservations=n.reservations.filter(r=>r.id!==id);return validate(n)}
  function spent(events,month,category){if(!validMonth(month)||!Array.isArray(events))fail('Consulta de presupuesto inválida');const values=[];for(const e of events){if(e.type!=='expense'||!String(e.date).startsWith(month+'-'))continue;if(!money(e.amount))fail('Movimiento inválido');if(Array.isArray(e.allocations)&&e.allocations.length){if(sum(e.allocations.map(a=>a.amount))!==e.amount)fail('Discriminación inconsistente');for(const a of e.allocations)if(norm(a.category||a.categoryId||'Sin categoría')===norm(category))values.push(a.amount)}else if(norm(e.category||'Sin categoría')===norm(category))values.push(e.amount)}return sum(values)}
  const api={fresh,validate,addBudget,addGoal,reserve,release,reserved,spent,sum};root.MF_PLANNING=api;if(typeof module==='object'&&module.exports)module.exports=api;
- if(!root.document)return;
+ if(!root.document||!root.document.getElementById("mfPlanStatus"))return;
  const $=id=>document.getElementById(id),fmt=n=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(n),uid=()=>crypto.randomUUID();
  function node(tag,text){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e}
  function status(text){$('mfPlanStatus').textContent=text}

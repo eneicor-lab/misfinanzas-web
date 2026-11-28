@@ -8,7 +8,6 @@ permissions:
   contents: read
 jobs:
   https-delivery:
-    if: ${{ !contains(github.event.head_commit.message, '[delivery-only]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     steps:
@@ -26,7 +25,7 @@ jobs:
           retention-days: 30
   android-download:
     needs: https-delivery
-    if: ${{ always() && (needs['https-delivery'].result == 'success' || contains(github.event.head_commit.message, '[delivery-only]')) }}
+    if: ${{ needs['https-delivery'].result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     permissions:
@@ -36,31 +35,42 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Deliver the existing approved signed APK; never rebuild or replace a release
+      - name: Deliver the newly verified signed APK without rebuilding
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api repos/$GITHUB_REPOSITORY/actions/jobs/140746696325 --jq .conclusion)" = success
-          git fetch --no-tags --depth=1 origin 0dd1e1642a2337e5bca1da89cb4008be76293ca4
-          git diff --exit-code 0dd1e1642a2337e5bca1da89cb4008be76293ca4 HEAD -- web android/app/src/main android/app/build.gradle.kts package.json
+          test "$(gh api repos/$GITHUB_REPOSITORY/actions/jobs/140791362563 --jq .conclusion)" = success
+          git fetch --no-tags --depth=1 origin b7c636d7bcb1ce55c57e401a27bb2327d8f20e00
+          git diff --exit-code b7c636d7bcb1ce55c57e401a27bb2327d8f20e00 HEAD -- web android/app/src/main android/app/build.gradle.kts package.json
           dir="$RUNNER_TEMP/mf-signed-delivery"
           mkdir -p "$dir"
-          gh run download 46043307612 --repo "$GITHUB_REPOSITORY" --name signed-android-0dd1e1642a2337e5bca1da89cb4008be76293ca4 --dir "$dir"
+          gh run download 46084541514 --repo "$GITHUB_REPOSITORY" --name signed-android-b7c636d7bcb1ce55c57e401a27bb2327d8f20e00 --dir "$dir"
           cd "$dir"
-          printf '%s\n' 'b1ec9a558403a2cca8dc8e8313f32bda6f51568503db11d974129a103bbdadb8  MisFinanzas-2.7.0-signed.apk' | sha256sum -c -
-          test "$(tr -d '\r\n' < COMMIT.txt)" = '0dd1e1642a2337e5bca1da89cb4008be76293ca4'
+          printf '%s\n' 'bd95512c42cbe8a35ddff2c482d879ef34369211ef2366ae9cbb7f78b6e5ee3d  MisFinanzas-2.7.1-signed.apk' | sha256sum -c -
+          test "$(tr -d '\r\n' < COMMIT.txt)" = 'b7c636d7bcb1ce55c57e401a27bb2327d8f20e00'
+          test -s ANDROID_ENTRY_QA.txt
+          grep -Fi '08da57bab4097f2ae71f4093a14d220e44c660f456a152ee01f8d224ab73d94b' SIGNATURE.txt
           cat > RELEASE_NOTES.md <<'NOTES'
-          MisFinanzas 2.7.0 para web y Android, con datos de prueba para aceptación del titular.
+          MisFinanzas 2.7.1 — aplicación integrada para aceptación del titular.
 
           Web: https://eneicor-lab.github.io/misfinanzas-web/
 
-          APK integral firmada, versión 2.7.0/código29, con el firmante e ícono existentes. Se entrega el mismo binario aprobado, sin nueva compilación.
+          Acceso, navegación y libro financiero compartidos. APK nueva, código30, con el firmante y el ícono originales. Publicación verificada por HTTPS y comparación de recursos.
 
-          Lanzar definitiva requiere la decisión y confirmación del titular; publicar o instalar no elimina datos ni usuarios. Conservar las copias cifradas y completar la aceptación antes de esa transición.
+          Recorridos financieros y transición con Auth/PostgreSQL/PostgREST reales aislados; diseño en seis resoluciones. Instalación y acceso central comprobados en emulador Android. No se afirma una prueba física ni una sesión financiera Android contra datos reales.
 
-          Validaciones: 14 casos focalizados de transición, respaldo cifrado y restauración comparada de18tablas, y carga HTTPS observada en escritorio/móvil. Las pruebas funcionales y nativas anteriores se reutilizan según sus fuentes sin cambios. La aceptación autenticada del titular es distinta de esta comprobación de entrega.
+          Lanzar definitiva solo se ejecuta por decisión y confirmación del titular. Publicar e instalar no elimina datos ni usuarios.
 
-          APK fuente: 0dd1e1642a2337e5bca1da89cb4008be76293ca4. Fuente integrada de aplicación idéntica: 10eb3780da53acb686fda75a5e965eb13793a3ff.
+          Fuente del APK: b7c636d7bcb1ce55c57e401a27bb2327d8f20e00
+          SHA-256: bd95512c42cbe8a35ddff2c482d879ef34369211ef2366ae9cbb7f78b6e5ee3d
           NOTES
-          printf '%s\n' "Publicación ejecutada desde: $GITHUB_SHA; código de aplicación idéntico al APK aprobado." >> RELEASE_NOTES.md
-          gh release create v2.7.0 MisFinanzas-2.7.0-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'MisFinanzas 2.7.0 — Web y Android' --notes-file RELEASE_NOTES.md
+          if gh release view v2.7.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            mkdir existing
+            gh release download v2.7.1 --repo "$GITHUB_REPOSITORY" --pattern MisFinanzas-2.7.1-signed.apk --dir existing
+            cmp MisFinanzas-2.7.1-signed.apk existing/MisFinanzas-2.7.1-signed.apk
+          else
+            gh release create v2.7.1 MisFinanzas-2.7.1-signed.apk SHA256SUMS.txt COMMIT.txt SIGNATURE.txt ANDROID_ENTRY_QA.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'MisFinanzas 2.7.1 — Web y Android' --notes-file RELEASE_NOTES.md
+            mkdir downloaded
+            gh release download v2.7.1 --repo "$GITHUB_REPOSITORY" --pattern MisFinanzas-2.7.1-signed.apk --dir downloaded
+            cmp MisFinanzas-2.7.1-signed.apk downloaded/MisFinanzas-2.7.1-signed.apk
+          fi

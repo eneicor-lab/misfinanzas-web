@@ -1,3 +1,23 @@
+# Estado vigente — Misión I.1 / retorno Chat 6
+
+Versión preparada 2.7.1 (Android código30), pendiente de publicación. Este apartado sustituye los estados históricos inferiores. Reanudación 27/11/2026 Colombia; interrupción posterior del entorno y acceso al navegador. Sin cambios de aplicación ni repetición de pruebas durante esta reanudación.
+
+Rama integration/misfinanzas-2.7.1, HEAD previo a este checkpoint 1b4f4f0fb855ae533e6ab568bbe1e60c9f561106. PR3 abierto, listo, sin fusionar: https://github.com/eneicor-lab/misfinanzas-web/pull/3 . Main continúa 409f7445a68e910b29123a019321ab1a0d0525e1.
+
+Aplicación y APK probadas corresponden a b7c636d7bcb1ce55c57e401a27bb2327d8f20e00. Los cambios posteriores solo afectan pruebas y entrega. Reutilizar run46084541514 (interfaz, servicios reales aislados, transición recuperable, APK firmada/emulador) y run46085339536 (orientación/zoom/foco). No recompilar ni repetir estas pruebas sin cambios.
+
+APK MisFinanzas-2.7.1-signed.apk SHA256 bd95512c42cbe8a35ddff2c482d879ef34369211ef2366ae9cbb7f78b6e5ee3d. Artifact15239030118: https://github.com/eneicor-lab/misfinanzas-web/actions/runs/46084541514/artifacts/15239030118 . Firma original preservada;38 recursos web/Android iguales.
+
+Integración terminada y probada de navegación única, sesión central, libro compartido, privacidad local, sincronización, crédito, planificación, notificaciones y recuperación. Lanzar definitiva probado con Auth/PostgreSQL reales aislados e interrupciones; NO ejecutado sobre datos del titular. Biometría opcional no habilitada; no se afirma prueba financiera autenticada en Android físico.
+
+Bloqueo inmediato: actualización del componente de transición desplegado aún sin confirmar. El navegador mostró inicio de sesión Supabase; solicitud segura de acceso terminó por timeout y el entorno/navegador quedaron indisponibles. No se confirmó autenticación ni despliegue. No modificar datos ni ejecutar transición real.
+
+Primera acción: confirmar actualización autorizada del componente de transición; después recuperar HEAD, fusionar PR3 con SHA esperado y observar qa-published-web. El workflow verifica HTTPS y38 recursos, publica la APK ya aprobada sin recompilar y comprueba descarga. No declarar web2.7.1 ni release disponibles antes de observarlo. Ante cambio de HEAD, revisar solo el delta. Preservar main hasta resolver dependencia; no nuevas instalaciones ni servicios.
+
+El checkpoint privado canónico conserva versión52; esta reanudación no pudo reemplazarlo por indisponibilidad del entorno. Este apéndice técnico público no contiene componentes ni documentación privados. Retorno manual Chat6; aceptación exclusivamente del titular.
+
+---
+
 # MisFinanzas — checkpoint técnico de integración
 
 Misión MF-WORK-LIBERACION-20261126-D. Autoridad de aceptación: Chat 5. Estado: EN EJECUCIÓN; preparación de liberación. Actualización 26/11/2026, Colombia.
